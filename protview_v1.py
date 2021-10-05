@@ -82,7 +82,7 @@ def checkDB(protid, proteins, data, df): #check to see if the ProteinID exists
 def select3D(protid, proteins): #ask user to choose from multiple structures if applicable
     pdbs = proteins[protid].PDBids
     if len(pdbs) > 1:
-        print("Protein ", protid, " has ", len(pdbs), " structures:\n", pdbs, '\n')
+        print("Protein ", protid, " has ", len(pdbs), " structures:\n", ''.join(i+', ' for i in pdbs)[:-2], '\n')
         select = input("Choose one either by name or number (ex: type 2 to get the 2nd structure): ")
         try:
             val = int(select)
