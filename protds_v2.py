@@ -210,9 +210,13 @@ def processRow(rowIndex, df): #simplify user experience by having them only quer
         return entry
 
 def getEntry(rowNum, moddata): 
-    rowList = moddata.loc[rowNum][['ProteinID', 'ModifiedLocationNum', 'ModifiedSequence']].values.tolist()
-    rowList.append(moddata.loc[rowNum].name)
-    return rowList
+    try:
+        rowList = moddata.loc[rowNum][['ProteinID', 'ModifiedLocationNum', 'ModifiedSequence']].values.tolist()
+        rowList.append(moddata.loc[rowNum].name)
+        return rowList
+    except:
+        print("Invalid Row Entry")
+        return ['NA', 'NA', 'NA', 'NA']
     
 def getProteins(data): #automate processing row-by-row and get modified entries; input: the dataset; output: list of modified rows
     global proteins #populate the dictionary of Proteins
@@ -243,21 +247,39 @@ def getView(entry, data):
             print("There were no results for", entry[0])
         elif not proteins[entry[0]].getSites()[0]:
             print(entry[0], "did not have binding sites listed in the UniProt databases")
+            #return getView_old(proteins[entry[0]].UniProtId)
         else:
             print("Invalid row entry") 
             
 def getView_old(protid): #search by protid [OLD; pending removal]
     if protid in proteins.keys(): 
-        pdb = proteins[protid].structures[selectPDB(proteins[protid])]
+        pdbs = proteins[protid].PDBids
         cmd = ''
         sites = ''
+        
+        select = 0
+        if len(pdbs) > 1: 
+            print("\nProtein ", proteins[protid].UniProtId, " has ", len(pdbs), " structures:\n", ''.join(i+', ' for i in pdbs)[:-2], '\n', sep='')
+            select = input("Choose one either by name or number (ex: type 2 to get the 2nd structure): ")
+            try:
+                val = int(select)
+                if val <= len(pdbs) and val > 0:
+                    select = int(val-1)
+                else:
+                    print("Invalid selection, the first structure will be selected:\n")
+            except ValueError:
+                if select.upper() in pdbs:
+                    select =  pdbs.index(select.upper())
+                else:
+                    print("Invalid PDB.", pdbs[0], "will be selected by default:\n")
+        
         for i in proteins[protid].record.features:
                     if 'BIND' in i.type or 'ACT' in i.type or 'METAL' in i.type or ('bind' in str(i.qualifiers) and 'CHAIN' not in i.type):  #ex: 5B3Z
                         loc = FeatureLocation(i.location.start+1, i.location.end)
                         sites = sites + str(loc)[1:-1].replace(':','-') + ',' #to fix the extra selection range
         cmd += 'select :' +sites[:-1]+ '; color FF0; '
 
-        return icn3dpy.view(q='mmdbid='+pdb.PDBid, command = cmd+'; view annotations; set view detailed view')
+        return icn3dpy.view(q='mmdbid='+pdbs[select], command = cmd+'; view annotations; set view detailed view')
         
     else:
         print("No results for", protid)
