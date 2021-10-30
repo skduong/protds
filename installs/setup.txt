@@ -1,5 +1,0 @@
-pip install icn3dpy==3.3.1
-pip install Bio
-pip install git+git://github.com/williamgilpin/pypdb
-pip install pandas
-conda install -c conda-forge biotite

@@ -173,7 +173,7 @@ dependencies:
     - jupyter-console==6.4.0
     - mygene==3.2.2
     - pandas==1.3.4
-    - pypdb==2.0
+    - git+git://github.com/williamgilpin/pypdb
     - qtconsole==5.1.1
     - qtpy==1.11.2
     - tqdm==4.62.3
