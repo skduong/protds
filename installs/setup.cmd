@@ -7,3 +7,4 @@ jupyter labextension install jupyterlab_3dmol
 ::pdb query
 pip install git
 pip install git+git://github.com/williamgilpin/pypdb
+conda install -c conda-forge biotite
