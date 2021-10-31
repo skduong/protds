@@ -132,7 +132,7 @@ def printDists(entry): #present the results of entryDist() nicely in tables
     
 #Visualization
 def selectPDB(protein): #ask user to pick a structure if > 1 exist
-    pdbs = [i.PDBid for i in protein.structures] 
+    pdbs = protein.PDBids
     if len(pdbs) > 1: 
         print("\nProtein ", protein.UniProtId, " has ", len(pdbs), " structures:\n", ''.join(i+', ' for i in pdbs)[:-2], '\n', sep='')
         select = input("Choose one either by name or number (ex: type 2 to get the 2nd structure): ")
@@ -154,17 +154,19 @@ def selectPDB(protein): #ask user to pick a structure if > 1 exist
         
 def entryView(entry): #get highlighted 3D view for a selected row (entry); returns an iCn3D view
     if entry[0] in proteins.keys(): #if protein exists 
-        pdb = proteins[entry[0]].structures[selectPDB(proteins[entry[0]])]
-        cmd = ''
-        sites = ''
-        for i in proteins[entry[0]].record.features: #format binding sites
-                    if 'BIND' in i.type or 'ACT' in i.type or 'METAL' in i.type or ('bind' in str(i.qualifiers) and 'CHAIN' not in i.type):  #ex: 5B3Z
-                        loc = FeatureLocation(i.location.start+1, i.location.end)
-                        sites = sites + str(loc)[1:-1].replace(':','-') + ',' #to fix the extra selection range
-        for i in checkChains(pdb.structure, entry[2]): #highlight only on applicable chains
-            cmd += 'select .{chain}:{mod}; color white; select .{chain}:'.format(chain = i, mod = str(entry[1]))+sites[:-1]+'; color FF0; '
-        return icn3dpy.view(q='mmdbid='+pdb.PDBid, command = cmd+';toggle highlight; view annotations; set view detailed view')
-        
+        pdb = proteins[entry[0]].PDBids[selectPDB(proteins[entry[0]])] 
+        if proteins[entry[0]].structures: #if structures are available
+            cmd = ''
+            sites = ''
+            for i in proteins[entry[0]].record.features: #format binding sites
+                        if 'BIND' in i.type or 'ACT' in i.type or 'METAL' in i.type or ('bind' in str(i.qualifiers) and 'CHAIN' not in i.type):  #ex: 5B3Z
+                            loc = FeatureLocation(i.location.start+1, i.location.end)
+                            sites = sites + str(loc)[1:-1].replace(':','-') + ',' #to fix the extra selection range
+            for i in checkChains(pdb.structure, entry[2]): #highlight only on applicable chains
+                cmd += 'select .{chain}:{mod}; color white; select .{chain}:'.format(chain = i, mod = str(entry[1]))+sites[:-1]+'; color FF0; '
+            return icn3dpy.view(q='mmdbid='+pdb.PDBid, command = cmd+';toggle highlight; view annotations; set view detailed view')
+        else:
+            return icn3dpy.view(q='mmdbid='+pdb, command = 'select :'+str(entry[1])+'; color white;'+';toggle highlight; view annotations; set view detailed view')   
     else:
         print("No results for", entry[0])
         return icn3dpy.view()
@@ -247,7 +249,7 @@ def getView(entry, data):
             print("There were no results for", entry[0])
         elif not proteins[entry[0]].getSites()[0]:
             print(entry[0], "did not have binding sites listed in the UniProt databases")
-            #return getView_old(proteins[entry[0]].UniProtId)
+            return entryView(entry) 
         else:
             print("Invalid row entry") 
             
