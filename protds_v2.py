@@ -159,7 +159,7 @@ def entryView(entry): #get highlighted 3D view for a selected row (entry); retur
             cmd = ''
             sites = ''
             for i in proteins[entry[0]].record.features: #format binding sites
-                        if 'BIND' in i.type or 'ACT' in i.type or 'METAL' in i.type or ('bind' in str(i.qualifiers) and 'CHAIN' not in i.type):  #ex: 5B3Z
+                        if 'BIND' in i.type or 'ACT' in i.type or 'METAL' in i.type or ('bind' in str(i.qualifiers) and 'CHAIN' not in i.type): 
                             loc = FeatureLocation(i.location.start+1, i.location.end)
                             sites = sites + str(loc)[1:-1].replace(':','-') + ',' #to fix the extra selection range
             for i in checkChains(pdb.structure, entry[2]): #highlight only on applicable chains
@@ -190,7 +190,7 @@ def processRow(rowIndex, df): #simplify user experience by having them only quer
     else:
         return entry
 
-def getEntry(rowNum, moddata): 
+def getEntry(rowNum, moddata): #summarize relavent row information in a list for processing
     try:
         rowList = moddata.loc[rowNum][['ProteinID', 'ModifiedLocationNum', 'ModifiedSequence']].values.tolist()
         rowList.append(moddata.loc[rowNum].name)
@@ -207,9 +207,9 @@ def getProteins(data): #automate processing row-by-row and get modified entries;
         searchPDB(i) 
     return list(filter(lambda x: x[0] in list(proteins.keys()) and proteins[x[0]].getSites()[0], df[['ProteinID', 'ModifiedLocationNum', 'ModifiedSequence', 'index']].values.tolist()))
 
-def getDistances(entry, data):
+def getDistances(entry, data): #return distances between a Protein's ModifiedLocationNum and its sites for all structures associated with that row entry
     try:
-        display(data[data['ModifiedLocationNum'].notna()].loc[entry[-1]].to_frame().T) #the only purpose of data is this display...
+        display(data[data['ModifiedLocationNum'].notna()].loc[entry[-1]].to_frame().T) #display row for user reference
         printDists(entry)
     except Exception as e:
         if entry[0] not in proteins.keys():
@@ -219,7 +219,7 @@ def getDistances(entry, data):
         else:
             print(e, "Invalid row entry") 
 
-def getView(entry, data):
+def getView(entry, data): #return iCn3D structure view for the entry's Protein
     try:
         display(data[data['ModifiedLocationNum'].notna()].loc[entry[-1]].to_frame().T) 
         return entryView(entry)
