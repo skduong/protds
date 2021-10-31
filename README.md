@@ -1,2 +1,2 @@
 # protds
-Test code for visualizing protein structures and binding sites.
+Test code for analyzing protein structures and binding sites.

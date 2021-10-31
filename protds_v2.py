@@ -154,8 +154,8 @@ def selectPDB(protein): #ask user to pick a structure if > 1 exist
         
 def entryView(entry): #get highlighted 3D view for a selected row (entry); returns an iCn3D view
     if entry[0] in proteins.keys(): #if protein exists 
-        pdb = proteins[entry[0]].PDBids[selectPDB(proteins[entry[0]])] 
         if proteins[entry[0]].structures: #if structures are available
+            pdb = proteins[entry[0]].structures[selectPDB(proteins[entry[0]])]
             cmd = ''
             sites = ''
             for i in proteins[entry[0]].record.features: #format binding sites
@@ -166,32 +166,11 @@ def entryView(entry): #get highlighted 3D view for a selected row (entry); retur
                 cmd += 'select .{chain}:{mod}; color white; select .{chain}:'.format(chain = i, mod = str(entry[1]))+sites[:-1]+'; color FF0; '
             return icn3dpy.view(q='mmdbid='+pdb.PDBid, command = cmd+';toggle highlight; view annotations; set view detailed view')
         else:
+            pdb = proteins[entry[0]].PDBids[selectPDB(proteins[entry[0]])] 
             return icn3dpy.view(q='mmdbid='+pdb, command = 'select :'+str(entry[1])+'; color white;'+';toggle highlight; view annotations; set view detailed view')   
     else:
         print("No results for", entry[0])
         return icn3dpy.view()
-        
-def selectLoc(protid, df, mods): #ask user to choose a row for ProteinIDs showing in multiple rows [unused; pending removal]
-    data = df[df['ProteinID']==protid]
-    print("Here are the rows containing", protid)
-    display(data)
-    choice = input("Type a row number to view, or type \"all\": ")
-    try: 
-        a = int(choice)
-        if a in data.index:
-            locnum = data.loc[a]['ModifiedLocationNum']
-            if not math.isnan(locnum):
-                print('ModifiedLocationNum',locnum, 'will be selected.\n')
-                return [int(locnum)]
-            else:
-                print("No modified location present")
-                return []
-    except:
-        if choice.lower() == 'all':
-            return mods.loc[protid]['ModifiedLocationNum']
-        else:
-            print("Invalid response. No ModifiedLocationNum selected.\n")
-            return []
             
 # notebook use
 def modData(data): #look at only modified rows/ convert location floats to integer 
@@ -252,37 +231,3 @@ def getView(entry, data):
             return entryView(entry) 
         else:
             print("Invalid row entry") 
-            
-def getView_old(protid): #search by protid [OLD; pending removal]
-    if protid in proteins.keys(): 
-        pdbs = proteins[protid].PDBids
-        cmd = ''
-        sites = ''
-        
-        select = 0
-        if len(pdbs) > 1: 
-            print("\nProtein ", proteins[protid].UniProtId, " has ", len(pdbs), " structures:\n", ''.join(i+', ' for i in pdbs)[:-2], '\n', sep='')
-            select = input("Choose one either by name or number (ex: type 2 to get the 2nd structure): ")
-            try:
-                val = int(select)
-                if val <= len(pdbs) and val > 0:
-                    select = int(val-1)
-                else:
-                    print("Invalid selection, the first structure will be selected:\n")
-            except ValueError:
-                if select.upper() in pdbs:
-                    select =  pdbs.index(select.upper())
-                else:
-                    print("Invalid PDB.", pdbs[0], "will be selected by default:\n")
-        
-        for i in proteins[protid].record.features:
-                    if 'BIND' in i.type or 'ACT' in i.type or 'METAL' in i.type or ('bind' in str(i.qualifiers) and 'CHAIN' not in i.type):  #ex: 5B3Z
-                        loc = FeatureLocation(i.location.start+1, i.location.end)
-                        sites = sites + str(loc)[1:-1].replace(':','-') + ',' #to fix the extra selection range
-        cmd += 'select :' +sites[:-1]+ '; color FF0; '
-
-        return icn3dpy.view(q='mmdbid='+pdbs[select], command = cmd+'; view annotations; set view detailed view')
-        
-    else:
-        print("No results for", protid)
-        return icn3dpy.view()
