@@ -61,14 +61,16 @@ def emailPrintDists(entry): #present the results of entryDist() nicely in tables
     for n, pdb in enumerate(emailEntryDist(entry)):
         print(proteins[entry[0]].PDBids[n])
         if len(pdb) > 0:
-            testdf = pd.DataFrame(pdb[0][1], columns = ['Type', 'ChainA'])
+            df = pd.DataFrame(pdb[0][1], columns = ['Type', 'ChainA'])
+            df['Location'] = ['-'.join(loc) for loc in [np.unique([str(i[0]), str(i[-1])]).tolist() for i in proteins[entry[0]].getSites()[0]]]
+            df = df[['Type', 'Location', 'ChainA']]
             if len(pdb)==1:
-                display(testdf)
+                display(df)
             else:
                 for i in pdb[1:]:
-                    testdf = pd.concat([testdf, pd.Series(data = map(lambda x: x[1], i[1]), name='Chain'+i[0])], axis=1)
-                testdf['Average'] = testdf.mean(numeric_only=True, axis=1) #last column contains average of all chains' distances
-                display(testdf)
+                    df = pd.concat([df, pd.Series(data = map(lambda x: x[1], i[1]), name='Chain'+i[0])], axis=1)
+                df['Average'] = df.mean(numeric_only=True, axis=1) #last column contains average of all chains' distances
+                display(df)
         else:
             display(pd.DataFrame())
 
