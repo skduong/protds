@@ -37,7 +37,7 @@ class Protein: #each unique protein in the dataset is represented by a Protein o
     def getSites(self): #list the position(s) and label of sites 
         sites = []; labels = []
         for i in self.record.features:
-            if 'BIND' in i.type or 'ACT' in i.type or 'METAL' in i.type or ('bind' in str(i.qualifiers) and 'CHAIN' not in i.type): 
+            if 'BIND' in i.type or 'ACT' in i.type or 'METAL' in i.type or 'SITE' in i.type or ('bind' in str(i.qualifiers) and 'CHAIN' not in i.type): 
                 loc = FeatureLocation(i.location.start+1, i.location.end)
                 sites.append(loc)
                 labels.append(i.type)
@@ -58,8 +58,8 @@ def get_mmtf(pdbid): #get atom coordinates of a pdb structure from first mmtf mo
     with TemporaryDirectory() as tempdir:
         mmtf_file_path = rcsb.fetch(pdbid, "mmtf", os.path.join(gettempdir(), tempdir))
         mmtf_file = mmtf.MMTFFile.read(mmtf_file_path)
-        structure = mmtf.get_structure(mmtf_file) 
-    return structure[0]  
+        structure = mmtf.get_structure(mmtf_file, model=1)
+    return structure  
 
 def searchPDB(id): #add a new id to the dictionary 
     global proteins
@@ -159,7 +159,7 @@ def entryView(entry): #get highlighted 3D view for a selected row (entry); retur
             cmd = ''
             sites = ''
             for i in proteins[entry[0]].record.features: #format binding sites
-                        if 'BIND' in i.type or 'ACT' in i.type or 'METAL' in i.type or ('bind' in str(i.qualifiers) and 'CHAIN' not in i.type): 
+                        if 'BIND' in i.type or 'ACT' in i.type or 'METAL' in i.type or 'SITE' in i.type or ('bind' in str(i.qualifiers) and 'CHAIN' not in i.type): 
                             loc = FeatureLocation(i.location.start+1, i.location.end)
                             sites = sites + str(loc)[1:-1].replace(':','-') + ',' #to fix the extra selection range
             for i in checkChains(pdb.structure, entry[2]): #highlight only on applicable chains
@@ -207,6 +207,9 @@ def getProteins(data): #automate processing row-by-row and get modified entries;
         searchPDB(i) 
     return list(filter(lambda x: x[0] in list(proteins.keys()) and proteins[x[0]].getSites()[0], df[['ProteinID', 'ModifiedLocationNum', 'ModifiedSequence', 'index']].values.tolist()))
 
+def printSites(prot): #display active sites for a given protein
+    display(pd.DataFrame(list(zip(prot.getSites()[1], prot.getSites()[0])), columns=['Type', 'Location']))
+    
 def getDistances(entry, data): #return distances between a Protein's ModifiedLocationNum and its sites for all structures associated with that row entry
     try:
         display(data[data['ModifiedLocationNum'].notna()].loc[entry[-1]].to_frame().T) #display row for user reference
