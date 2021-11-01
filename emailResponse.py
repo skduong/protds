@@ -36,8 +36,19 @@ def emailView(protid, modlist): #accommodating the new task from the email; entr
         print("No results for", protid)
         return icn3dpy.view()
         
-def emailEntryChains(entry): #no chain info; assuming all 
-    return map(lambda x: np.unique(x.chain_id).tolist(), proteins[entry[0]].getStrucs())
+def checkChains_loc(pdb, modloc): #include chain if it's within range of modified location
+    chainIDs = np.unique(pdb.chain_id)
+    if len(chainIDs) == 1: #single chain
+        return [pdb.chain_id[0]] #assuming that single chains will always contain the subsequence
+    else:
+        chainList = []
+        for j in chainIDs:
+            if modloc in pdb[pdb.chain_id == j].res_id:
+                chainList.append(j)
+    return chainList
+    
+def emailEntryChains(entry): #returns a list of valid chains for all PDBs associated with an entry's protein
+    return map(lambda x: checkChains_loc(x, entry[1]), proteins[entry[0]].getStrucs())
         
 def emailCalcDist(structure, chain, entry): #entry = [ProtID, modloc]
     arr, lab = proteins[entry[0]].getSites()
