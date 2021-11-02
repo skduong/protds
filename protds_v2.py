@@ -91,21 +91,22 @@ def chainSeq(chain, struc): #chain: a string indicating which chain to look at; 
               'GLY', 'PRO', 'ALA', 'VAL', 'ILE', 'LEU', 'MET', 'PHE', 'TYR', 'TRP']
     return seq.ProteinSequence(np.take(struc[(struc.chain_id == chain) & (np.isin(struc.res_name, aaList))].res_name, 
             np.unique(struc[(struc.chain_id == chain) & (np.isin(struc.res_name, aaList))].res_id, return_index=True)[1]))
-
-def checkChains(pdb, modstr): #modstr: ModifiedSequence of a row; returns a list of valid chains for a given pdb
+    
+def checkChains(pdb, entry): #returns a list of valid chains for a given pdb; checking for modLoc in range + modSequence contained in subsequence 
     chainIDs = np.unique(pdb.chain_id)
     if len(chainIDs) == 1: #single chain
-        return [pdb.chain_id[0]] #assuming that single chains will always contain the subsequence
+        return [chainIDs[0]] #assuming that single chains will always contain the subsequence
     else:
         chainList = []
         for j in chainIDs:
             chain = str(chainSeq(j, pdb))
-            if modstr.split('[')[0] in chain and modstr.split(']')[-1] in chain: #ModifiedSequence is a subsequence of this chain
+            check = [entry[2].split('[')[0] in chain and entry[2].split(']')[-1] in chain, entry[1] in pdb[pdb.chain_id == j].res_id]
+            if sum(check) == 2: #both conditions are true
                 chainList.append(j)
-    return chainList
+    return chainList 
     
 def entryChains(entry): #returns a list of valid chains for all PDBs associated with an entry's protein
-    return map(lambda x: checkChains(x, entry[2]), proteins[entry[0]].getStrucs())
+    return map(lambda x: checkChains(x, entry), proteins[entry[0]].getStrucs())
     
 #Distance
 def calcDist(structure, chain, entry): #returns the distances between a PDB structure's binding sites and the entry's ModifiedLocationNum for a given chain
@@ -164,7 +165,7 @@ def entryView(entry): #get highlighted 3D view for a selected row (entry); retur
                         if 'BIND' in i.type or 'ACT' in i.type or 'METAL' in i.type or 'SITE' in i.type or ('bind' in str(i.qualifiers) and 'CHAIN' not in i.type): 
                             loc = FeatureLocation(i.location.start+1, i.location.end)
                             sites = sites + str(loc)[1:-1].replace(':','-') + ',' #to fix the extra selection range
-            for i in checkChains(pdb.structure, entry[2]): #highlight only on applicable chains
+            for i in checkChains(pdb.structure, entry): #highlight only on applicable chains
                 cmd += 'select .{chain}:{mod}; color white; select .{chain}:'.format(chain = i, mod = str(entry[1]))+sites[:-1]+'; color FF0; '
             return icn3dpy.view(q='mmdbid='+pdb.PDBid, command = cmd+';toggle highlight; view annotations; set view detailed view')
         else:
@@ -180,27 +181,6 @@ def modData(data): #look at only modified rows/ convert location floats to integ
     df['ModifiedLocationNum'] = df['ModifiedLocationNum'].astype(int) #convert ModifiedLocationNum to integers
     return df
     
-def processRow(rowIndex, df): #simplify user experience by having them only query using row indices
-    entry = getEntry(rowIndex, df)
-    if entry[0] not in proteins.keys():
-        try:
-            searchPDB(entry[0])
-            return entry
-        except: 
-            print("Row couldn't be processed")
-            return []
-    else:
-        return entry
-
-def getEntry(rowNum, moddata): #summarize relavent row information in a list for processing
-    try:
-        rowList = moddata.loc[rowNum][['ProteinID', 'ModifiedLocationNum', 'ModifiedSequence']].values.tolist()
-        rowList.append(moddata.loc[rowNum].name)
-        return rowList
-    except:
-        print("Invalid Row Entry")
-        return ['NA', 'NA', 'NA', 'NA']
-    
 def getProteins(data): #automate processing row-by-row and get modified entries; input: the dataset; output: list of modified rows
     global proteins #populate the dictionary of Proteins
     df = data[data['ModifiedLocationNum'].notna()].reset_index()
@@ -212,21 +192,39 @@ def getProteins(data): #automate processing row-by-row and get modified entries;
 def printSites(prot): #display active sites for a given protein
     display(pd.DataFrame(list(zip(prot.getSites()[1], prot.getSites()[0])), columns=['Type', 'Location']))
     
-def getDistances(entry, data): #return distances between a Protein's ModifiedLocationNum and its sites for all structures associated with that row entry
+def checkRow(row): #verify chosen rows before getting distances/ structure views
     try:
-        display(data[data['ModifiedLocationNum'].notna()].loc[entry[-1]].to_frame().T) #display row for user reference
+        entry = [row['ProteinID'], row['ModifiedLocationNum'].astype(int), row['ModifiedSequence'], row.name]
+        if entry[0] not in proteins.keys():
+            try:
+                searchPDB(entry[0])
+                return entry
+            except:
+                print("Search for", entry[0], 'failed.')
+                return ['NA', 'NA', 'NA', 'NA']
+        else: 
+            return entry
+    except Exception as e: 
+        print(e, "Invalid row entry")
+        return ['NA', 'NA', 'NA', 'NA']
+    
+def getDistances(row): #return distances between a Protein's ModifiedLocationNum and its sites for all structures associated with that row entry
+    entry = checkRow(row)
+    try:
+        display(row.to_frame().T)
         printDists(entry)
-    except Exception as e:
+    except:
         if entry[0] not in proteins.keys():
             print("There were no results for", entry[0])
         elif not proteins[entry[0]].getSites()[0]:
             print(entry[0], "did not have binding sites listed in the UniProt databases")
         else:
-            print(e, "Invalid row entry") 
-
-def getView(entry, data): #return iCn3D structure view for the entry's Protein
+            print("Invalid row entry")     
+ 
+def getView(row): #return iCn3D structure view for the entry's Protein
+    entry = checkRow(row)
     try:
-        display(data[data['ModifiedLocationNum'].notna()].loc[entry[-1]].to_frame().T) 
+        display(row.to_frame().T)
         return entryView(entry)
     except:
         if entry[0] not in proteins.keys():

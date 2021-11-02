@@ -2,27 +2,6 @@ from protds_v2 import *
 
 #New requests from email
 #(Mostly minor modifications to take into consideration the lack of ModifiedSequence)
-def emailGetEntry(rowNum, moddata): #returns [ProtID, modloc, index]
-    try:
-        rowList = moddata.loc[rowNum][['ProteinID', 'ModifiedLocationNum']].values.tolist()
-        rowList.append(moddata.loc[rowNum].name)
-        return rowList
-    except:
-        print("Invalid Row Entry")
-        return ['NA', 'NA', 'NA']
-
-def emailProcessRow(rowIndex, df): #simplify user experience by having them only query using row indices
-    entry = emailGetEntry(rowIndex, df)
-    if entry[0] not in proteins.keys():
-        try:
-            searchPDB(entry[0])
-            return entry
-        except: 
-            print("Row couldn't be processed")
-            return []
-    else:
-        return entry
- 
 def emailView(protid, modlist): #accommodating the new task from the email; entry = [ProteinID, [list of locs1], [list of locs2]]
     if protid in proteins.keys(): #if protein exists 
         pdb = proteins[protid].PDBids[selectPDB(proteins[protid])]
@@ -73,10 +52,27 @@ def emailPrintDists(entry): #present the results of entryDist() nicely in tables
                 display(df)
         else:
             display(pd.DataFrame())
-
-def emailGetDistances(entry, data): #called by user to get distances
+            
+def emailCheckRow(row):
     try:
-        display(data[data['ModifiedLocationNum'].notna()].loc[entry[-1]].to_frame().T) 
+        entry = [row['ProteinID'], row['ModifiedLocationNum'].astype(int), row.name]
+        if entry[0] not in proteins.keys():
+            try:
+                searchPDB(entry[0])
+                return entry
+            except:
+                print("Search for", entry[0], 'failed.')
+                return ['NA', 'NA', 'NA']
+        else:
+            return entry
+    except Exception as e: 
+        print(e, "Invalid row entry")
+        return ['NA', 'NA', 'NA']
+    
+def emailGetDistances(row): #error handling for user input before printing
+    entry = emailCheckRow(row)
+    try:
+        display(row.to_frame().T)
         emailPrintDists(entry)
     except:
         if entry[0] not in proteins.keys():
@@ -84,4 +80,4 @@ def emailGetDistances(entry, data): #called by user to get distances
         elif not proteins[entry[0]].getSites()[0]:
             print(entry[0], "did not have binding sites listed in the UniProt databases")
         else:
-            print("Invalid row entry") 
+            print("Invalid row entry")     
