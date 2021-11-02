@@ -10,6 +10,7 @@ import biotite.structure.io.mmtf as mmtf
 from Bio.SeqFeature import FeatureLocation
 from Bio import SwissProt
 #general utilities
+import pickle
 import numpy as np
 import pandas as pd
 from IPython.display import display
@@ -181,12 +182,19 @@ def modData(data): #look at only modified rows/ convert location floats to integ
     df['ModifiedLocationNum'] = df['ModifiedLocationNum'].astype(int) #convert ModifiedLocationNum to integers
     return df
     
-def getProteins(data): #automate processing row-by-row and get modified entries; input: the dataset; output: list of modified rows
-    global proteins #populate the dictionary of Proteins
-    df = data[data['ModifiedLocationNum'].notna()].reset_index()
-    df['ModifiedLocationNum'] = df['ModifiedLocationNum'].astype(int)
+def getProteins(data, load_pickle=False, save_pickle=False): #automate processing row-by-row and get modified entries; input: the dataset; output: list of modified rows
+    global proteins 
+    if load_pickle: #load proteins dictionary from previous sessions
+        with open('proteins.pkl', 'rb') as handle:
+            savedProteins = pickle.load(handle)
+        proteins.update(savedProteins)
     for i in data['ProteinID'].unique()[:4]: #[TESTING] only first 4 proteins; [Have not tried iterating through all of them]
         searchPDB(i) 
+    if save_pickle: #save proteins for future sessions
+        with open('proteins.pkl', 'wb') as handle:
+            pickle.dump(proteins, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    df = data[data['ModifiedLocationNum'].notna()].reset_index()
+    df['ModifiedLocationNum'] = df['ModifiedLocationNum'].astype(int)
     return list(filter(lambda x: x[0] in list(proteins.keys()) and proteins[x[0]].getSites()[0], df[['ProteinID', 'ModifiedLocationNum', 'ModifiedSequence', 'index']].values.tolist()))
 
 def printSites(prot): #display active sites for a given protein
