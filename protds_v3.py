@@ -299,13 +299,15 @@ def getPepView(proteinID, data):
 #Email Requests
 def emailRow(row):
     return [row['ProteinID'], row['ModifiedLocationNum'].astype(int), row.name]
-def emailView(protid, loc1, loc2): #highlights all chains, assumes 2 sets of locations provided by datasets
+def emailView(protid, loc1, loc2, best=True): #highlights all chains, assumes 2 sets of locations provided by datasets
     entry = [protid, 1, 2]
     if protid in proteins.keys(): 
         pdb = proteins[entry[0]].structures[selectPDB(proteins[entry[0]])]
+        chainSelect = '.'+checkChains(pdb, protid)[0] if best else ''
         sites1, sites2 = [locToStr(i) for i in alignLoc([loc1, loc2], entry[0], pdb)]
         if len(sites1)>0 and len(sites2)>0: #they both have sites after alignment
-            cmd = 'select :{s1}; color 000000; select :'.format(s1 = ','.join([i for i in sites1]))+ ','.join([i for i in sites2])+'; color FFD700;'
+             cmd = 'select {chain}:{s1}; color 000000; select {chain}:'.format(chain = chainSelect, s1 = ','.join(
+                [i for i in sites1]))+ ','.join([i for i in sites2])+'; color FFD700;'
         else:
             cmd = ''
         return icn3dpy.view(q='mmdbid='+pdb.PDBid, command = cmd+';toggle highlight; view annotations; set view detailed view; set background white')
