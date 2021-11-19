@@ -68,31 +68,35 @@ def get_uniprot (query='',query_type='ACC'): #for querying UniProtDB; returns an
     data = urllib.parse.urlencode(params).encode('ascii')
     request = urllib.request.Request(url, data)
     return urllib.request.urlopen(request, timeout=20)
-    
+       
 def get_mmtf(pdbid): #get atom coordinates of a pdb structure from first mmtf model; returns a biotite AtomArray 
     with TemporaryDirectory() as tempdir:
         mmtf_file_path = rcsb.fetch(pdbid, "mmtf", os.path.join(gettempdir(), tempdir))
         mmtf_file = mmtf.MMTFFile.read(mmtf_file_path)
         structure = mmtf.get_structure(mmtf_file, model=1) 
-    return structure
+    return structure 
     
-def searchPDB(id): #add a new id to the dictionary 
+def searchPDB(id, limit = True): #add a new id to the dictionary 
     global proteins
-    if id not in proteins:
+    if id not in proteins: 
         #search PDB 
         search_operator = text_operators.ExactMatchOperator(value= id, attribute="rcsb_polymer_entity_container_identifiers.reference_sequence_identifiers.database_accession")
         return_type = ReturnType.POLYMER_ENTITY
         try: 
             results = perform_search(search_operator, return_type)
-            proteins[id] = Protein(id)
-            #get sites from UniProt
-            handle = get_uniprot(query = id, query_type = 'ACC')
-            try:
-                proteins[id].record = SwissProt.read(handle)
-                proteins[id].structures = list(map(lambda x: PDB(x, get_mmtf(x)), map(lambda x: x.split('_')[0], results)))
-            except Exception as e:
-                print("UniProt did not have results for ", id)
-                print(e)
+            if limit and len(results) > 100: #will handle slower structures separately
+                print(id, "has over 100 structures")
+                return True
+            else:
+                proteins[id] = Protein(id)
+                #get sites from UniProt
+                handle = get_uniprot(query = id, query_type = 'ACC')
+                try:
+                    proteins[id].record = SwissProt.read(handle)
+                    proteins[id].structures = list(map(lambda x: PDB(x, get_mmtf(x)), map(lambda x: x.split('_')[0], results))) #need list?
+                except Exception as e:
+                    print("UniProt did not have results for ", id)
+                    print(e)
         except: 
             print('There were no results for', id, '\n')    
             return False
@@ -101,7 +105,7 @@ def searchPDB(id): #add a new id to the dictionary
 def chainSeq(chain, pdbStruc): #chain: a string indicating which chain to look at; pdbStruc: a biotite structure for some PDB
     aaList = ['ARG', 'HIS', 'LYS', 'ASP', 'GLU', 'SER', 'THR', 'ASN', 'GLN', 'CYS', 'SEC', 
               'GLY', 'PRO', 'ALA', 'VAL', 'ILE', 'LEU', 'MET', 'PHE', 'TYR', 'TRP']
-    try: 
+    try:
         structure = struc.array(np.take(pdbStruc[(pdbStruc.chain_id == chain) & (np.isin(pdbStruc.res_name, aaList))], 
                 np.unique(pdbStruc[(pdbStruc.chain_id == chain) & (np.isin(pdbStruc.res_name, aaList))].res_id, return_index=True)[1]))
         return seq.ProteinSequence(structure.res_name), structure.res_id
@@ -115,13 +119,13 @@ def checkChains(pdb, protid): #assign the chain with highest alignment score
             pdb.bestChain = chainIDs[0], align.align_optimal(proteins[protid].getSequence(), chainSeq(chainIDs[0], pdb.structure)[0], align.SubstitutionMatrix.std_protein_matrix())[0].score
         else:
             scores = []
-            chainIDs = [i for i in chainIDs if (len(pdb.structure[pdb.structure.chain_id == i].res_name[0]) == 3)]
+            chainIDs = [i for i in chainIDs if (len(pdb.structure[pdb.structure.chain_id == i].res_name[0]) == 3)] 
             for i in chainIDs:
                 seq = chainSeq(i, pdb.structure)[0] 
                 if len(seq)>0: 
                     ali = align.align_optimal(proteins[protid].getSequence(), seq, align.SubstitutionMatrix.std_protein_matrix())[0]
                     if align.get_sequence_identity(ali) > 0.5: #filter out poorly aligned chains
-                        scores.append(ali.score)
+                        scores.append(ali.score) 
                     else:
                         scores.append(-99999)
             pdb.bestChain = chainIDs[np.argmax(scores)], max(scores)
@@ -136,43 +140,53 @@ def alignLoc(locs, protid, pdb):
     ali = align.align_optimal(proteins[protid].getSequence(), seq[0], align.SubstitutionMatrix.std_protein_matrix())[0]
     try:
         mainSeq = [i[0] for i in ali.trace]
-        return [list(map(lambda x: seq[1][x], [list(map(lambda x: ali.trace[mainSeq.index(x-1)][1], 
-        filter(lambda x: ali.trace[mainSeq.index(x-1)][1] > -1, location))) for location in loc])) for loc in locs]
+        alignedLocs = [[list(map(lambda x: ali.trace[mainSeq.index(x-1)][1], location)) for location in loc] for loc in locs]
+        if len(locs)>1: 
+            missing = [[np.array(i[0])[np.where(np.array(i[1]) == -1)[0]] for i in zip(locs[0], alignedLocs[0])],
+                       [i[0] for i in zip(locs[1], alignedLocs[1]) if i[1]==[-1]]]
+        else: 
+            missing = []
+        return ([list(map(lambda x: seq[1][x], [list(map(lambda x: ali.trace[mainSeq.index(x-1)][1], 
+                filter(lambda x: ali.trace[mainSeq.index(x-1)][1] > -1, location))) for location in loc])) for loc in locs], missing)
     except Exception as e:
         print(e, "Something went wrong")
         return []
-      
+
 #Distance
 def calcDist(pdb, chain, entry): #returns the distances between a PDB structure's binding sites and the entry's ModifiedLocationNum for a given chain
     structure = pdb.structure
     uniProtSites = proteins[entry[0]].getSites()
     alignedSites = alignLoc([uniProtSites[0], [[entry[1]]]], entry[0], pdb)
-    return map(lambda x,y: (x,y), uniProtSites[1], map(lambda x: struc.distance(struc.mass_center(structure[(structure.chain_id==chain) & (structure.res_id==alignedSites[1][0])]), struc.mass_center(x)), [structure[(structure.chain_id==chain) & (np.isin(structure.res_id, j))] for j in alignedSites[0]]))
+    if not alignedSites[1][1]: 
+        return map(lambda x,y,z: (x,y,z), uniProtSites[1], map(lambda x: struc.distance(struc.mass_center(structure[(structure.chain_id==chain) & (structure.res_id==alignedSites[0][1][0])]), struc.mass_center(x)), [structure[(structure.chain_id==chain) & (np.isin(structure.res_id, j))] for j in alignedSites[0][0]]), alignedSites[1][0])
+    else:
+        return []
 
 def printDists(entry, best): #display the results of entryDists with tables
     bestStruc = bestPDB(entry[0])
     for pdbDist in [[(i.bestChain[0], calcDist(i, i.bestChain[0], entry)), i.PDBid] for i in ([bestStruc] if best else proteins[entry[0]].structures)]:
         print(pdbDist[1])
-        if len(pdbDist) > 0: 
-            df = pd.DataFrame(pdbDist[0][1], columns = ['Type', 'Chain'+pdbDist[0][0]])
+        if isinstance(pdbDist[0][1], map) and len(pdbDist)>0:
+            df = pd.DataFrame(pdbDist[0][1], columns = ['Type', 'Chain'+pdbDist[0][0], 'Missing'])
             df['Location'] = locToStr(proteins[entry[0]].getSites()[0])
-            df = df[['Type', 'Location', 'Chain'+pdbDist[0][0]]]
+            df = df[['Type', 'Location', 'Chain'+pdbDist[0][0], 'Missing']]
             display(df)
         else:
+            print("***ModifiedLocationNum", entry[1], "is missing from the structure***")
             display(pd.DataFrame())
 
 #Visualization
 def locToStr(locList): #locList = [[L1,L2], [L3], [etc]] 
     return ['-'.join(loc) for loc in [pd.unique([str(i[0]), str(i[-1])]).tolist() for i in locList if len(i)>0] if '[]' not in loc]
 
-def pdbView(protid, loc1, loc2, best, full): #highlight iCn3D structure with locations from loc1(red) and loc2(black)
+def pdbView(protid, loc1, loc2, best, full): #highlight iCn3D structure with locations from loc1(red) and loc2(black); loc as in locList
     if protid in proteins.keys(): 
         pdb = proteins[protid].structures[selectPDB(proteins[protid])]
         chainSelect = '.'+checkChains(pdb, protid)[0] if best else ''
         viewSelect = '' if full else 'select {chain}; show selection;'.format(chain = chainSelect) 
         settings = ';toggle highlight; view annotations; set view detailed view; set background white;'
         if len(loc1)>0 and loc2[0][0]: #both sites exist
-            sites1, sites2 = [locToStr(i) for i in alignLoc([loc1, loc2], protid, pdb)]
+            sites1, sites2 = [locToStr(i) for i in alignLoc([loc1, loc2], protid, pdb)[0]]
             if len(sites1)>0 and len(sites2)>0: #they both have sites after alignment
                 cmd = viewSelect + 'select {chain}:{s1}; color red; select {chain}:'.format(chain = chainSelect, s1 = ','.join(
                 [i for i in sites1]))+ ','.join([i for i in sites2])+'; color 000000;'
@@ -185,7 +199,7 @@ def pdbView(protid, loc1, loc2, best, full): #highlight iCn3D structure with loc
             return icn3dpy.view(q='mmdbid='+pdb.PDBid, command = cmd + settings)
             
         elif len(loc1)>0 or loc2[0][0]: #one of them exists
-            sites = locToStr(alignLoc([loc1], protid, pdb)[0]) if len(loc1)>0 else locToStr(alignLoc([loc2], protid, pdb)[0])
+            sites = locToStr(alignLoc([loc1], protid, pdb)[0][0]) if len(loc1)>0 else locToStr(alignLoc([loc2], protid, pdb)[0][0])
             cmd = viewSelect + 'select {chain}:{s1}; color 000000;'.format(chain = chainSelect, s1 = ','.join([i for i in sites])) if len(sites)>0 else ''
             return icn3dpy.view(q='mmdbid='+pdb.PDBid, command = cmd + settings)
             
@@ -195,7 +209,7 @@ def pdbView(protid, loc1, loc2, best, full): #highlight iCn3D structure with loc
     else:
         print("No results for", protid)
         return icn3dpy.view(command = 'set background white')
-
+        
 def selectPDB(protein): #ask user to pick a structure if > 1 exist
     pdbs = protein.getPDBs()
     if len(pdbs) > 1: 
@@ -223,15 +237,17 @@ def modData(data): #look at only modified rows/ convert location floats to integ
     df['ModifiedLocationNum'] = df['ModifiedLocationNum'].astype(int)
     return df
     
-def getProteins(data, load_pickle=False, save_pickle=False, fname = 'proteins.pkl'): 
-    #global proteins
+def getProteins(data, load_pickle=False, save_pickle=False, fname = 'proteins.pkl'):
+    tooMany = []
     if load_pickle: loadProteins() 
-    for i in data['ProteinID'].unique()[:4]:
-        searchPDB(i) 
+    for i in data['ProteinID'].unique(): 
+        if searchPDB(i):
+            tooMany.append(i)
     if save_pickle: saveProteins() 
-    df = data[data['ModifiedLocationNum'].notna()].reset_index()
-    df['ModifiedLocationNum'] = df['ModifiedLocationNum'].astype(int)
-    return list(filter(lambda x: x[0] in proteins.keys() and proteins[x[0]].getSites()[0], df[['ProteinID', 'ModifiedLocationNum', 'ModifiedSequence', 'index']].values.tolist())) 
+    return tooMany
+    #df = data[data['ModifiedLocationNum'].notna()].reset_index()
+    #df['ModifiedLocationNum'] = df['ModifiedLocationNum'].astype(int)
+    #return list(filter(lambda x: x[0] in proteins.keys(), df[['ProteinID', 'ModifiedLocationNum', 'index']].values.tolist()))
 
 def printSites(prot): #display active sites for a given protein
     display(pd.DataFrame(list(zip(prot.getSites()[1], prot.getSites()[0])), columns=['Type', 'Location']))
@@ -255,12 +271,23 @@ def checkRow(row): #verify rows and return [ProteinID, ModifiedLocationNum, Inde
         print(e, "Invalid row entry")
         return ['NA', 'NA', 'NA']    
 
+def getPepView(proteinID, data): #for some proteinID, highlight all peptides in yellow
+    df = data[data['ProteinID']==proteinID]
+    display(df)
+    pdb = proteins[proteinID].structures[selectPDB(proteins[proteinID])]
+    if len(df)>0:
+        cmd = ''
+        for i in df['PeptideSequence']: cmd += 'select :'+ i + '; color FFD700;'
+        return icn3dpy.view(q='mmdbid='+pdb.PDBid, command = cmd+';toggle highlight; view annotations; set view detailed view; set background white;')
+    else:
+        print("Invalid input data")
+        
 def getDistances(row, best=True): #error handling for user input before printing
     entry = checkRow(row)
     try:
         display(row.to_frame().T)
         if entry[1]:
-            if not proteins[entry[0]].getSites()[0]: 
+            if not proteins[entry[0]].getSites()[0]:
                 print(entry[0], "did not have binding sites listed in the UniProt databases")
             else:
                 printDists(entry, best)
@@ -271,8 +298,8 @@ def getDistances(row, best=True): #error handling for user input before printing
             print("There were no results for", entry[0])
         else:
             print(e, "Invalid row entry")  
-
-def getEntryView(row, best=True, full=True):
+ 
+def getEntryView(row, best=True, full=True): 
     entry = checkRow(row)
     try:
         display(row.to_frame().T)
@@ -285,17 +312,6 @@ def getEntryView(row, best=True, full=True):
         else:
             print(e,"Invalid row entry")
 
-def getPepView(proteinID, data):
-    df = data[data['ProteinID']==proteinID]
-    display(df)
-    pdb = proteins[proteinID].structures[selectPDB(proteins[proteinID])]
-    if len(df)>0:
-        cmd = ''
-        for i in df['PeptideSequence']: cmd += 'select :'+ i + '; color FFD700;'
-        return icn3dpy.view(q='mmdbid='+pdb.PDBid, command = cmd+';toggle highlight; view annotations; set view detailed view; set background white;')
-    else:
-        print("Invalid input data")
-
 #Email Requests
 def emailRow(row):
     return [row['ProteinID'], row['ModifiedLocationNum'].astype(int), row.name]
@@ -304,7 +320,7 @@ def emailView(protid, loc1, loc2, best=True): #highlights all chains, assumes 2 
     if protid in proteins.keys(): 
         pdb = proteins[entry[0]].structures[selectPDB(proteins[entry[0]])]
         chainSelect = '.'+checkChains(pdb, protid)[0] if best else ''
-        sites1, sites2 = [locToStr(i) for i in alignLoc([loc1, loc2], entry[0], pdb)]
+        sites1, sites2 = [locToStr(i) for i in alignLoc([loc1, loc2], entry[0], pdb)[0]]
         if len(sites1)>0 and len(sites2)>0: #they both have sites after alignment
              cmd = 'select {chain}:{s1}; color 000000; select {chain}:'.format(chain = chainSelect, s1 = ','.join(
                 [i for i in sites1]))+ ','.join([i for i in sites2])+'; color FFD700;'
