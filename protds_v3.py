@@ -1,5 +1,7 @@
 #pypdb: access Protein Data Bank
+from pypdb.clients.search.search_client import QueryGroup, LogicalOperator
 from pypdb.clients.search.search_client import perform_search, ReturnType
+from pypdb.clients.search.search_client import perform_search_with_graph
 from pypdb.clients.search.operators import text_operators
 #biotite: tool for working with structure coordinates and sequences
 import biotite.sequence as seq
@@ -37,7 +39,7 @@ class Protein: #each unique protein in the dataset is represented by a Protein o
         return [i.PDBid for i in self.structures] 
     
     def getSequence(self):
-        return seq.ProteinSequence(self.record.sequence)
+        return seq.ProteinSequence(self.record.sequence.replace('U', 'X').replace('O', 'X'))
     
     def getSites(self): #lists the position(s) and label of sites 
         sites = []; labels = []
@@ -76,27 +78,37 @@ def get_mmtf(pdbid): #get atom coordinates of a pdb structure from first mmtf mo
         structure = mmtf.get_structure(mmtf_file, model=1) 
     return structure 
     
-def searchPDB(id, limit = True): #add a new id to the dictionary 
+def searchPDB(id): #add a new id to the dictionary 
     global proteins
     if id not in proteins: 
         #search PDB 
-        search_operator = text_operators.ExactMatchOperator(value= id, attribute="rcsb_polymer_entity_container_identifiers.reference_sequence_identifiers.database_accession")
-        return_type = ReturnType.POLYMER_ENTITY
+        search_operator = text_operators.ExactMatchOperator(
+            value= id, 
+            attribute="rcsb_polymer_entity_container_identifiers.reference_sequence_identifiers.database_accession")
+        return_type = ReturnType.ENTRY
         try: 
             results = perform_search(search_operator, return_type)
-            if limit and len(results) > 100: #will handle slower structures separately
-                print(id, "has over 100 structures")
-                return True
-            else:
-                proteins[id] = Protein(id)
-                #get sites from UniProt
-                handle = get_uniprot(query = id, query_type = 'ACC')
-                try:
-                    proteins[id].record = SwissProt.read(handle)
-                    proteins[id].structures = list(map(lambda x: PDB(x, get_mmtf(x)), map(lambda x: x.split('_')[0], results))) #need list?
-                except Exception as e:
-                    print("UniProt did not have results for ", id)
-                    print(e)
+            if len(results)>15: 
+                for i in np.arange(1,5,0.5):
+                    try: 
+                        resolution_operator = text_operators.ComparisonOperator(
+                            value=i, 
+                            attribute="rcsb_entry_info.resolution_combined", 
+                            comparison_type=text_operators.ComparisonType.LESS)
+                        both = QueryGroup(queries = [search_operator, resolution_operator], logical_operator = LogicalOperator.AND)
+                        results = perform_search_with_graph(query_object=both, return_type=return_type)
+                        break
+                    except:
+                        continue
+            proteins[id] = Protein(id)
+            #get sites from UniProt
+            handle = get_uniprot(query = id, query_type = 'ACC')
+            try:
+                proteins[id].record = SwissProt.read(handle)
+                proteins[id].structures = list(map(lambda x: PDB(x, get_mmtf(x)), map(lambda x: x.split('_')[0], results)))
+            except Exception as e:
+                print("UniProt did not have results for ", id)
+                print(e)
         except: 
             print('There were no results for', id, '\n')    
             return False
