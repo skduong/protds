@@ -44,7 +44,7 @@ class Protein: #each unique protein in the dataset is represented by a Protein o
     def getSites(self): #lists the position(s) and label of sites 
         sites = []; labels = []
         for i in self.record.features:
-            if 'BIND' in i.type or 'ACT' in i.type or 'METAL' in i.type or 'SITE' in i.type or ('bind' in str(i.qualifiers) and 'CHAIN' not in i.type): 
+            if 'BIND' in i.type or 'METAL' in i.type or 'SITE' in i.type or ('bind' in str(i.qualifiers) and 'REGION' in i.type): 
                 sites.append(FeatureLocation(i.location.start+1, i.location.end))
                 labels.append(i.type)
         return list(map(lambda x: list(range(x.start, x.end+1)), sites)), labels
