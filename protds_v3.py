@@ -250,13 +250,10 @@ def modData(data): #look at only modified rows/ convert location floats to integ
     return df
     
 def getProteins(data, load_pickle=False, save_pickle=False, fname = 'proteins.pkl'):
-    tooMany = []
     if load_pickle: loadProteins() 
     for i in data['ProteinID'].unique(): 
-        if searchPDB(i):
-            tooMany.append(i)
+        searchPDB(i)
     if save_pickle: saveProteins() 
-    return tooMany
     #df = data[data['ModifiedLocationNum'].notna()].reset_index()
     #df['ModifiedLocationNum'] = df['ModifiedLocationNum'].astype(int)
     #return list(filter(lambda x: x[0] in proteins.keys(), df[['ProteinID', 'ModifiedLocationNum', 'index']].values.tolist()))
