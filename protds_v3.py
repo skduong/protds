@@ -245,7 +245,7 @@ def selectPDB(protein): #ask user to pick a structure if > 1 exist
 
 # notebook use
 def modData(data): #look at only modified rows/ convert location floats to integer 
-    df = data[data['ModifiedLocationNum'].notna()]
+    df = data[data['ModifiedLocationNum'].notna()].copy()
     df['ModifiedLocationNum'] = df['ModifiedLocationNum'].astype(int)
     return df
     
