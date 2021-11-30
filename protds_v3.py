@@ -280,16 +280,21 @@ def checkRow(row): #verify rows and return [ProteinID, ModifiedLocationNum, Inde
         print(e, "Invalid row entry")
         return ['NA', 'NA', 'NA']    
 
-def getPepView(proteinID, data): #for some proteinID, highlight all peptides in yellow
+def getPepView(proteinID, data, table=True): 
+    if proteinID not in proteins:
+        searchPDB(proteinID)
     df = data[data['ProteinID']==proteinID]
-    display(df)
-    pdb = proteins[proteinID].structures[selectPDB(proteins[proteinID])]
-    if len(df)>0:
-        cmd = ''
-        for i in df['PeptideSequence']: cmd += 'select :'+ i + '; color FFD700;'
-        return icn3dpy.view(q='mmdbid='+pdb.PDBid, command = cmd+';toggle highlight; view annotations; set view detailed view; set background white;')
-    else:
-        print("Invalid input data")
+    if table: display(df)
+    try:
+        pdb = proteins[proteinID].structures[selectPDB(proteins[proteinID])]
+        if len(df)>0:
+            cmd = ''
+            for i in df['PeptideSequence']: cmd += 'select :'+ i + '; color FFD700;'
+            return icn3dpy.view(q='mmdbid='+pdb.PDBid, command = cmd+';toggle highlight; view annotations; set view detailed view; set background white;')
+        else:
+            print("Invalid input data")
+    except:
+        print("Protein Data Bank did not have results for", proteinID)
         
 def getDistances(row, best=True): #error handling for user input before printing
     entry = checkRow(row)
