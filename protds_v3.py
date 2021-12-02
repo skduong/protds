@@ -89,6 +89,7 @@ def searchPDB(id): #add a new id to the dictionary
         try: 
             results = perform_search(search_operator, return_type)
             if len(results)>15: 
+                results = []
                 for i in np.arange(1,5,0.5):
                     try: 
                         resolution_operator = text_operators.ComparisonOperator(
@@ -96,16 +97,16 @@ def searchPDB(id): #add a new id to the dictionary
                             attribute="rcsb_entry_info.resolution_combined", 
                             comparison_type=text_operators.ComparisonType.LESS)
                         both = QueryGroup(queries = [search_operator, resolution_operator], logical_operator = LogicalOperator.AND)
-                        results = perform_search_with_graph(query_object=both, return_type=return_type)
-                        break
+                        results += perform_search_with_graph(query_object=both, return_type=return_type)
+                        if len(results)>5: break 
                     except:
-                        continue
+                        continue            
             proteins[id] = Protein(id)
             #get sites from UniProt
             handle = get_uniprot(query = id, query_type = 'ACC')
             try:
                 proteins[id].record = SwissProt.read(handle)
-                proteins[id].structures = list(map(lambda x: PDB(x, get_mmtf(x)), map(lambda x: x.split('_')[0], results)))
+                proteins[id].structures = list(map(lambda x: PDB(x, get_mmtf(x)), map(lambda x: x.split('_')[0], results))) #need list?
             except Exception as e:
                 print("UniProt did not have results for ", id)
                 print(e)
@@ -191,7 +192,7 @@ def printDists(entry, best): #display the results of entryDists with tables
 def locToStr(locList): #locList = [[L1,L2], [L3], [etc]] 
     return ['-'.join(loc) for loc in [pd.unique([str(i[0]), str(i[-1])]).tolist() for i in locList if len(i)>0] if '[]' not in loc]
 
-def pdbView(protid, loc1, loc2, best, full): #highlight iCn3D structure with locations from loc1(red) and loc2(black); loc as in locList
+def pdbView(protid, loc1, loc2, best, full): #highlight iCn3D structure with locations from loc1(red) and loc2(black)
     if protid in proteins.keys(): 
         pdb = proteins[protid].structures[selectPDB(proteins[protid])]
         chainSelect = '.'+checkChains(pdb, protid)[0] if best else ''
@@ -280,19 +281,29 @@ def checkRow(row): #verify rows and return [ProteinID, ModifiedLocationNum, Inde
         print(e, "Invalid row entry")
         return ['NA', 'NA', 'NA']    
 
-def getPepView(proteinID, data, table=True): 
+def getPepView(protid, data, table=True, first=False):
+    proteinID = protid.split('-')[0] #disregard character after the uniprotID
     if proteinID not in proteins:
         searchPDB(proteinID)
-    df = data[data['ProteinID']==proteinID]
+        
+    df = data[data['ProteinID'].str.contains(protid)].copy()
+    colors = ['red', 'yellow', 'blue', 'green']
+    readings = df.filter(regex='[0-9]min').apply(pd.to_numeric, errors='coerce').fillna(-1).values
+    df['Color'] = ['cyan' if max(i)<0 else colors[list(i).index(max(i))%(len(colors)-1)] for i in readings]
     if table: display(df)
+        
     try:
-        pdb = proteins[proteinID].structures[selectPDB(proteins[proteinID])]
+        if first:
+            pdb = proteins[proteinID].structures[0]
+        else:
+            pdb = proteins[proteinID].structures[selectPDB(proteins[proteinID])] 
+       
         if len(df)>0:
-            cmd = ''
-            for i in df['PeptideSequence']: cmd += 'select :'+ i + '; color FFD700;'
+            cmd = 'color A9A9A9;'
+            for i in df[['PeptideSequence', 'Color']].values: cmd += 'select :'+ i[0] + '; color '+ i[1]+';'
             return icn3dpy.view(q='mmdbid='+pdb.PDBid, command = cmd+';toggle highlight; view annotations; set view detailed view; set background white;')
         else:
-            print("Invalid input data")
+            print("The input data did not contain", proteinID)
     except:
         print("Protein Data Bank did not have results for", proteinID)
         
