@@ -281,15 +281,14 @@ def checkRow(row): #verify rows and return [ProteinID, ModifiedLocationNum, Inde
         print(e, "Invalid row entry")
         return ['NA', 'NA', 'NA']    
 
-def getPepView(protid, data, table=True, first=False):
+def getPepView(protid, data, table=True, colors = ['red', 'yellow', 'blue', 'green', 'cyan'], first=False): 
     proteinID = protid.split('-')[0] #disregard character after the uniprotID
     if proteinID not in proteins:
         searchPDB(proteinID)
         
     df = data[data['ProteinID'].str.contains(protid)].copy()
-    colors = ['red', 'yellow', 'blue', 'green']
     readings = df.filter(regex='[0-9]min').apply(pd.to_numeric, errors='coerce').fillna(-1).values
-    df['Color'] = ['cyan' if max(i)<0 else colors[list(i).index(max(i))%(len(colors)-1)] for i in readings]
+    df['Color'] = [colors[-1] if max(i)<0 else colors[:-1][list(i).index(max(i))%(len(colors)-1)] for i in readings]
     if table: display(df)
         
     try:
