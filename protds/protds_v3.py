@@ -189,9 +189,6 @@ def printDists(entry, best): #display the results of entryDists with tables
             display(pd.DataFrame())
 
 def dfDists(data): #calculate and append sites and distance information to the dataset [IN PROGRESS]
-    #include only modified entries
-    moddata = data[data['ModifiedLocationNum'].notna()].copy() 
-    moddata['ModifiedLocationNum'] = moddata['ModifiedLocationNum'].astype(int)
     df = data.copy()[['ProteinID', 'ModifiedLocation', 'ModifiedLocationNum']]
     noResults = [i for i in pd.unique(df['ProteinID']) if searchPDB(i)==False]
     df['HasResults'] = ~df['ProteinID'].isin(noResults)
@@ -372,8 +369,10 @@ def getEntryView(row, chainSelect='best', full=True):
             print(e,"Invalid row entry")
 
 def getOutput(data, filename): #will most-likely fail for really large datasets [TESTING]
+    moddata = data[data['ModifiedLocationNum'].notna()].copy() #include only modified entries
+    moddata['ModifiedLocationNum'] = moddata['ModifiedLocationNum'].astype(int)
     try:
-        outTable = dfDists(data)
+        outTable = dfDists(moddata)
         #long table
         outTable.explode(['Type', 'Sites', 'Distances', 'MissingSites']).to_csv(os.path.join(os.getcwd(),"output",filename+'_long.csv')) 
         #summary table
