@@ -174,7 +174,7 @@ def calcDist(pdb, chain, entry): #returns the distances between a PDB structure'
         return map(lambda x,y,z: (x,y,z), uniProtSites[1], map(lambda x: struc.distance(struc.mass_center(structure[(structure.chain_id==chain) & (structure.res_id==alignedSites[0][1][0])]), struc.mass_center(x)), [structure[(structure.chain_id==chain) & (np.isin(structure.res_id, j))] for j in alignedSites[0][0]]), alignedSites[1][0])
     else:
         return []
-
+        
 def printDists(entry, best): #display the results of entryDists with tables
     bestStruc = bestPDB(entry[0])
     for pdbDist in [[(i.bestChain[0], calcDist(i, i.bestChain[0], entry)), i.PDBid] for i in ([bestStruc] if best else proteins[entry[0]].structures)]:
@@ -188,6 +188,42 @@ def printDists(entry, best): #display the results of entryDists with tables
             print("***ModifiedLocationNum", entry[1], "is missing from the structure***")
             display(pd.DataFrame())
 
+def dfDists(data): #calculate and append sites and distance information to the dataset [IN PROGRESS]
+    df = data.copy()[['ProteinID', 'ModifiedLocation', 'ModifiedLocationNum']]
+    noResults = [i for i in pd.unique(df['ProteinID']) if searchPDB(i)==False]
+    df['HasResults'] = ~df['ProteinID'].isin(noResults)
+    entries = df[['ProteinID', 'ModifiedLocationNum', 'HasResults']].values.tolist() 
+    #sites
+    df['Sites'] = [[locToStr([i])[0] for i in proteins[e[0]].getSites()[0]] if e[2] else [] for e in entries]
+    df['NumOfSites'] = [len(i) for i in df['Sites']]
+    entries = df[['ProteinID', 'ModifiedLocationNum', 'ModifiedLocation', 'NumOfSites']].values.tolist()
+    #distances
+    missing=[]; dists=[]
+    for entry in entries:
+        if entry[3]>0: 
+            struc = bestPDB(entry[0])
+            dist = list(calcDist(struc, struc.bestChain[0], entry))
+            if len(dist)>0:
+                dists.append([round(i[1],3) for i in dist])
+                missing.append([i[2] for i in dist])
+            else:
+                dists.append([np.NaN for i in range(entry[3])])
+                missing.append([[] for i in range(entry[3])]) 
+                entry[2] += '*'
+        else:
+            dists.append([])
+            missing.append([])
+    df['Distances'] = dists
+    df['ModifiedLocation'] = [i[2] for i in entries]
+    df['MissingSites'] = missing
+    return df.drop(columns=['ModifiedLocationNum'])[['ProteinID', 'ModifiedLocation', 'HasResults',
+                                                     'NumOfSites', 'Sites', 'Distances', 'MissingSites']]
+'''
+dsummary = df.copy()
+dsummary['MissingSites'] = [[x for x in i if len(x)>0] for i in dsummary['MissingSites']]
+dlong = df.explode(['Sites', 'Distances', 'MissingSites'])
+'''
+            
 #Visualization
 def locToStr(locList): #locList = [[L1,L2], [L3], [etc]] 
     return ['-'.join(loc) for loc in [pd.unique([str(i[0]), str(i[-1])]).tolist() for i in locList if len(i)>0] if '[]' not in loc]
