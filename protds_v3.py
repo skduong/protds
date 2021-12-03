@@ -189,12 +189,16 @@ def printDists(entry, best): #display the results of entryDists with tables
             display(pd.DataFrame())
 
 def dfDists(data): #calculate and append sites and distance information to the dataset [IN PROGRESS]
+    #include only modified entries
+    moddata = data[data['ModifiedLocationNum'].notna()].copy() 
+    moddata['ModifiedLocationNum'] = moddata['ModifiedLocationNum'].astype(int)
     df = data.copy()[['ProteinID', 'ModifiedLocation', 'ModifiedLocationNum']]
     noResults = [i for i in pd.unique(df['ProteinID']) if searchPDB(i)==False]
     df['HasResults'] = ~df['ProteinID'].isin(noResults)
-    entries = df[['ProteinID', 'ModifiedLocationNum', 'HasResults']].values.tolist() 
+    entries = df[['ProteinID', 'HasResults']].values.tolist() 
     #sites
-    df['Sites'] = [[locToStr([i])[0] for i in proteins[e[0]].getSites()[0]] if e[2] else [] for e in entries]
+    df['Sites'] = [[locToStr([i])[0] for i in proteins[e[0]].getSites()[0]] if e[1] else [] for e in entries]
+    df['Type'] = [[i for i in proteins[e[0]].getSites()[1]] if e[1] else [] for e in entries]
     df['NumOfSites'] = [len(i) for i in df['Sites']]
     entries = df[['ProteinID', 'ModifiedLocationNum', 'ModifiedLocation', 'NumOfSites']].values.tolist()
     #distances
@@ -206,7 +210,7 @@ def dfDists(data): #calculate and append sites and distance information to the d
             if len(dist)>0:
                 dists.append([round(i[1],3) for i in dist])
                 missing.append([i[2] for i in dist])
-            else:
+            else: 
                 dists.append([np.NaN for i in range(entry[3])])
                 missing.append([[] for i in range(entry[3])]) 
                 entry[2] += '*'
@@ -216,22 +220,17 @@ def dfDists(data): #calculate and append sites and distance information to the d
     df['Distances'] = dists
     df['ModifiedLocation'] = [i[2] for i in entries]
     df['MissingSites'] = missing
-    return df.drop(columns=['ModifiedLocationNum'])[['ProteinID', 'ModifiedLocation', 'HasResults',
-                                                     'NumOfSites', 'Sites', 'Distances', 'MissingSites']]
-'''
-dsummary = df.copy()
-dsummary['MissingSites'] = [[x for x in i if len(x)>0] for i in dsummary['MissingSites']]
-dlong = df.explode(['Sites', 'Distances', 'MissingSites'])
-'''
+    return df.drop(columns=['ModifiedLocationNum'])[['ProteinID', 'ModifiedLocation', 'HasResults', 'NumOfSites',
+                                                     'Type', 'Sites', 'Distances', 'MissingSites']]
             
 #Visualization
 def locToStr(locList): #locList = [[L1,L2], [L3], [etc]] 
     return ['-'.join(loc) for loc in [pd.unique([str(i[0]), str(i[-1])]).tolist() for i in locList if len(i)>0] if '[]' not in loc]
 
-def pdbView(protid, loc1, loc2, best, full): #highlight iCn3D structure with locations from loc1(red) and loc2(black)
+def pdbView(protid, loc1, loc2, chainSelect, full): #highlight iCn3D structure with locations from loc1(red) and loc2(black)
     if protid in proteins.keys(): 
         pdb = proteins[protid].structures[selectPDB(proteins[protid])]
-        chainSelect = '.'+checkChains(pdb, protid)[0] if best else ''
+        chainSelect = '.'+checkChains(pdb, protid)[0] if chainSelect=='best' else ''
         viewSelect = '' if full else 'select {chain}; show selection;'.format(chain = chainSelect) 
         settings = ';toggle highlight; view annotations; set view detailed view; set background white;'
         if len(loc1)>0 and loc2[0][0]: #both sites exist
@@ -359,19 +358,30 @@ def getDistances(row, best=True): #error handling for user input before printing
         else:
             print(e, "Invalid row entry")  
  
-def getEntryView(row, best=True, full=True): 
+def getEntryView(row, chainSelect='best', full=True): 
     entry = checkRow(row)
     try:
         display(row.to_frame().T)
         if not proteins[entry[0]].getSites()[0]:
             print(entry[0], "did not have binding sites listed in the UniProt databases")
-        return pdbView(entry[0], proteins[entry[0]].getSites()[0], [[entry[1]]], best, full)
+        return pdbView(entry[0], proteins[entry[0]].getSites()[0], [[entry[1]]], chainSelect, full)
     except Exception as e:
         if entry[0] not in proteins.keys():
             print("There were no results for", entry[0])
         else:
             print(e,"Invalid row entry")
 
+def getOutput(data, filename): #will most-likely fail for really large datasets [TESTING]
+    try:
+        outTable = dfDists(data)
+        #long table
+        outTable.explode(['Type', 'Sites', 'Distances', 'MissingSites']).to_csv(os.path.join("output",filename+'_long.csv')) 
+        #summary table
+        outTable['MissingSites'] = [[x for x in i if len(x)>0] for i in outTable['MissingSites']]
+        outTable.to_csv(os.path.join("output",filename+'_summary.csv')) 
+    except Exception as e:
+        print(e)
+            
 #Email Requests
 def emailRow(row):
     return [row['ProteinID'], row['ModifiedLocationNum'].astype(int), row.name]
