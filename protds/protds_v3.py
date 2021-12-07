@@ -170,7 +170,7 @@ def calcDist(pdb, chain, entry): #returns the distances between a PDB structure'
     structure = pdb.structure
     uniProtSites = proteins[entry[0]].getSites()
     alignedSites = alignLoc([uniProtSites[0], [[entry[1]]]], entry[0], pdb)
-    if not alignedSites[1][1]: 
+    if not alignedSites[1][1]: #suggest you change it to: if len(alignedSites[1][1])>0
         return map(lambda x,y,z: (x,y,z), uniProtSites[1], map(lambda x: struc.distance(struc.mass_center(structure[(structure.chain_id==chain) & (structure.res_id==alignedSites[0][1][0])]), struc.mass_center(x)), [structure[(structure.chain_id==chain) & (np.isin(structure.res_id, j))] for j in alignedSites[0][0]]), alignedSites[1][0])
     else:
         return []
@@ -376,7 +376,7 @@ def getOutput(data, filename): #will most-likely fail for really large datasets 
         #long table
         outTable.explode(['Type', 'Sites', 'Distances', 'MissingSites']).to_csv(os.path.join(os.getcwd(),"output",filename+'_long.csv')) 
         #summary table
-        outTable['MissingSites'] = [[x for x in i if len(x)>0] for i in outTable['MissingSites']]
+        outTable['MissingSites'] = [[x.tolist() for x in i if len(x)>0] for i in outTable['MissingSites']]
         outTable.to_csv(os.path.join(os.getcwd(),"output",filename+'_summary.csv')) 
     except Exception as e:
         print(e)
