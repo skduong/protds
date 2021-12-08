@@ -130,14 +130,14 @@ def checkChains(pdb, protid): #assign the chain with highest alignment score
         chainIDs = pd.unique(pdb.structure.chain_id)
         if len(chainIDs) == 1: #single chain
             pdb.bestChain = chainIDs[0], align.align_optimal(proteins[protid].getSequence(), chainSeq(chainIDs[0], pdb.structure)[0],
-                                                             align.SubstitutionMatrix.std_protein_matrix())[0].score
+                                                             align.SubstitutionMatrix.std_protein_matrix(), local=True)[0].score
         else:
             scores = []
             chainIDs = [i for i in chainIDs if (len(pdb.structure[pdb.structure.chain_id == i].res_name[0]) == 3)] 
             for i in chainIDs:
                 seq = chainSeq(i, pdb.structure)[0] 
                 if len(seq)>0: 
-                    ali = align.align_optimal(proteins[protid].getSequence(), seq, align.SubstitutionMatrix.std_protein_matrix())[0]
+                    ali = align.align_optimal(proteins[protid].getSequence(), seq, align.SubstitutionMatrix.std_protein_matrix(), local=True)[0]
                     if align.get_sequence_identity(ali) > 0.5: #filter out poorly aligned chains
                         scores.append(ali.score) 
                     else:
