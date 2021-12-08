@@ -129,14 +129,15 @@ def checkChains(pdb, protid): #assign the chain with highest alignment score
     if not pdb.bestChain:
         chainIDs = pd.unique(pdb.structure.chain_id)
         if len(chainIDs) == 1: #single chain
-            pdb.bestChain = chainIDs[0], align.align_optimal(proteins[protid].getSequence(), chainSeq(chainIDs[0], pdb.structure)[0], align.SubstitutionMatrix.std_protein_matrix())[0].score
+            pdb.bestChain = chainIDs[0], align.align_optimal(proteins[protid].getSequence(), chainSeq(chainIDs[0], pdb.structure)[0],
+                                                             align.SubstitutionMatrix.std_protein_matrix(), local=True)[0].score
         else:
             scores = []
             chainIDs = [i for i in chainIDs if (len(pdb.structure[pdb.structure.chain_id == i].res_name[0]) == 3)] 
             for i in chainIDs:
                 seq = chainSeq(i, pdb.structure)[0] 
                 if len(seq)>0: 
-                    ali = align.align_optimal(proteins[protid].getSequence(), seq, align.SubstitutionMatrix.std_protein_matrix())[0]
+                    ali = align.align_optimal(proteins[protid].getSequence(), seq, align.SubstitutionMatrix.std_protein_matrix(), local=True)[0]
                     if align.get_sequence_identity(ali) > 0.5: #filter out poorly aligned chains
                         scores.append(ali.score) 
                     else:
@@ -148,30 +149,36 @@ def bestPDB(protid): #return the structure with the best alignment to the row's 
     return proteins[protid].structures[np.argmax([i[1] for i in [checkChains(x, protid) for x in proteins[protid].structures]])]
     
 #Alignment
-def alignLoc(locs, protid, pdb): 
+def alignLoc(locs, protid, pdb): #get aligned positions for a list of locations
     seq = chainSeq(checkChains(pdb, protid)[0], pdb.structure)
-    ali = align.align_optimal(proteins[protid].getSequence(), seq[0], align.SubstitutionMatrix.std_protein_matrix())[0]
     try:
+        ali = align.align_optimal(proteins[protid].getSequence(), seq[0], align.SubstitutionMatrix.std_protein_matrix(), local=True)[0]
         mainSeq = [i[0] for i in ali.trace]
         alignedLocs = [[list(map(lambda x: ali.trace[mainSeq.index(x-1)][1], location)) for location in loc] for loc in locs]
-        if len(locs)>1: 
-            missing = [[np.array(i[0])[np.where(np.array(i[1]) == -1)[0]] for i in zip(locs[0], alignedLocs[0])],
-                       [i[0] for i in zip(locs[1], alignedLocs[1]) if i[1]==[-1]]]
-        else: 
-            missing = []
-        return ([list(map(lambda x: seq[1][x], [list(map(lambda x: ali.trace[mainSeq.index(x-1)][1], 
-                filter(lambda x: ali.trace[mainSeq.index(x-1)][1] > -1, location))) for location in loc])) for loc in locs], missing)
+    except ValueError:
+        ali = align.align_optimal(proteins[protid].getSequence(), seq[0], align.SubstitutionMatrix.std_protein_matrix())[0] 
+        mainSeq = [i[0] for i in ali.trace]
+        alignedLocs = [[list(map(lambda x: ali.trace[mainSeq.index(x-1)][1], location)) for location in loc] for loc in locs]
     except Exception as e:
         print(e, "Something went wrong")
         return []
-
+  
+    if len(locs)>1: 
+            missing = [[np.array(i[0])[np.where(np.array(i[1]) == -1)[0]] for i in zip(locs[0], alignedLocs[0])],
+                       [i[0] for i in zip(locs[1], alignedLocs[1]) if i[1]==[-1]]]
+    else: 
+        missing = []
+    return ([list(map(lambda x: seq[1][x], [list(map(lambda x: ali.trace[mainSeq.index(x-1)][1], 
+            filter(lambda x: ali.trace[mainSeq.index(x-1)][1] > -1, location))) for location in loc])) for loc in locs], missing)
 #Distance
 def calcDist(pdb, chain, entry): #returns the distances between a PDB structure's binding sites and the entry's ModifiedLocationNum for a given chain
     structure = pdb.structure
     uniProtSites = proteins[entry[0]].getSites()
     alignedSites = alignLoc([uniProtSites[0], [[entry[1]]]], entry[0], pdb)
     if not alignedSites[1][1]:
-        return map(lambda x,y,z: (x,y,z), uniProtSites[1], map(lambda x: struc.distance(struc.mass_center(structure[(structure.chain_id==chain) & (structure.res_id==alignedSites[0][1][0])]), struc.mass_center(x)), [structure[(structure.chain_id==chain) & (np.isin(structure.res_id, j))] for j in alignedSites[0][0]]), alignedSites[1][0])
+        return map(lambda x,y,z: (x,y,z), uniProtSites[1], map(lambda x: struc.distance(struc.mass_center(structure[(structure.chain_id==chain) &
+                  (structure.res_id==alignedSites[0][1][0])]), struc.mass_center(x)), [structure[(structure.chain_id==chain) &
+                  (np.isin(structure.res_id, j))] for j in alignedSites[0][0]]), alignedSites[1][0])
     else:
         return []
         
@@ -224,10 +231,10 @@ def dfDists(data): #calculate and append sites and distance information to the d
 def locToStr(locList): #locList = [[L1,L2], [L3], [etc]] 
     return ['-'.join(loc) for loc in [pd.unique([str(i[0]), str(i[-1])]).tolist() for i in locList if len(i)>0] if '[]' not in loc]
 
-def pdbView(protid, loc1, loc2, chainSelect, full): #highlight iCn3D structure with locations from loc1(red) and loc2(black)
+def pdbView(protid, loc1, loc2, showChain, full): #highlight iCn3D structure with locations from loc1(red) and loc2(black)
     if protid in proteins.keys(): 
         pdb = proteins[protid].structures[selectPDB(proteins[protid])]
-        chainSelect = '.'+checkChains(pdb, protid)[0] if chainSelect=='best' else ''
+        chainSelect = '.'+checkChains(pdb, protid)[0] if showChain=='best' else showChain
         viewSelect = '' if full else 'select {chain}; show selection;'.format(chain = chainSelect) 
         settings = ';toggle highlight; view annotations; set view detailed view; set background white;'
         if len(loc1)>0 and loc2[0][0]: #both sites exist
@@ -287,9 +294,6 @@ def getProteins(data, load_pickle=False, save_pickle=False, fname = 'proteins.pk
     for i in data['ProteinID'].unique(): 
         searchPDB(i)
     if save_pickle: saveProteins() 
-    #df = data[data['ModifiedLocationNum'].notna()].reset_index()
-    #df['ModifiedLocationNum'] = df['ModifiedLocationNum'].astype(int)
-    #return list(filter(lambda x: x[0] in proteins.keys(), df[['ProteinID', 'ModifiedLocationNum', 'index']].values.tolist()))
 
 def printSites(prot): #display active sites for a given protein
     display(pd.DataFrame(list(zip(prot.getSites()[1], prot.getSites()[0])), columns=['Type', 'Location']))
@@ -355,13 +359,13 @@ def getDistances(row, best=True): #error handling for user input before printing
         else:
             print(e, "Invalid row entry")  
  
-def getEntryView(row, chainSelect='best', full=True): 
+def getEntryView(row, showChain='best', full=True): #set showChain='' to select locations on every chain, or specify a chain letter to choose one other than the 'best' aligned one
     entry = checkRow(row)
     try:
         display(row.to_frame().T)
         if not proteins[entry[0]].getSites()[0]:
             print(entry[0], "did not have binding sites listed in the UniProt databases")
-        return pdbView(entry[0], proteins[entry[0]].getSites()[0], [[entry[1]]], chainSelect, full)
+        return pdbView(entry[0], proteins[entry[0]].getSites()[0], [[entry[1]]], showChain, full)
     except Exception as e:
         if entry[0] not in proteins.keys():
             print("There were no results for", entry[0])
