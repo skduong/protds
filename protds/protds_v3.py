@@ -130,14 +130,14 @@ def checkChains(pdb, protid): #assign the chain with highest alignment score
         chainIDs = pd.unique(pdb.structure.chain_id)
         if len(chainIDs) == 1: #single chain
             pdb.bestChain = chainIDs[0], align.align_optimal(proteins[protid].getSequence(), chainSeq(chainIDs[0], pdb.structure)[0],
-                                                             align.SubstitutionMatrix.std_protein_matrix(), local=True)[0].score
+                                                             align.SubstitutionMatrix.std_protein_matrix())[0].score
         else:
             scores = []
             chainIDs = [i for i in chainIDs if (len(pdb.structure[pdb.structure.chain_id == i].res_name[0]) == 3)] 
             for i in chainIDs:
                 seq = chainSeq(i, pdb.structure)[0] 
                 if len(seq)>0: 
-                    ali = align.align_optimal(proteins[protid].getSequence(), seq, align.SubstitutionMatrix.std_protein_matrix(), local=True)[0]
+                    ali = align.align_optimal(proteins[protid].getSequence(), seq, align.SubstitutionMatrix.std_protein_matrix())[0]
                     if align.get_sequence_identity(ali) > 0.5: #filter out poorly aligned chains
                         scores.append(ali.score) 
                     else:
@@ -150,26 +150,21 @@ def bestPDB(protid): #return the structure with the best alignment to the row's 
     
 #Alignment
 def alignLoc(locs, protid, pdb): #get aligned positions for a list of locations
-    seq = chainSeq(checkChains(pdb, protid)[0], pdb.structure)
+   seq = chainSeq(checkChains(pdb, protid)[0], pdb.structure)
+    ali = align.align_optimal(proteins[protid].getSequence(), seq[0], align.SubstitutionMatrix.std_protein_matrix())[0]
     try:
-        ali = align.align_optimal(proteins[protid].getSequence(), seq[0], align.SubstitutionMatrix.std_protein_matrix(), local=True)[0]
         mainSeq = [i[0] for i in ali.trace]
         alignedLocs = [[list(map(lambda x: ali.trace[mainSeq.index(x-1)][1], location)) for location in loc] for loc in locs]
-    except ValueError:
-        ali = align.align_optimal(proteins[protid].getSequence(), seq[0], align.SubstitutionMatrix.std_protein_matrix())[0] 
-        mainSeq = [i[0] for i in ali.trace]
-        alignedLocs = [[list(map(lambda x: ali.trace[mainSeq.index(x-1)][1], location)) for location in loc] for loc in locs]
+        if len(locs)>1: 
+            missing = [[np.array(i[0])[np.where(np.array(i[1]) == -1)[0]] for i in zip(locs[0], alignedLocs[0])],
+                       [i[0] for i in zip(locs[1], alignedLocs[1]) if i[1]==[-1]]]
+        else: 
+            missing = []
+        return ([list(map(lambda x: seq[1][x], [list(map(lambda x: ali.trace[mainSeq.index(x-1)][1], 
+                filter(lambda x: ali.trace[mainSeq.index(x-1)][1] > -1, location))) for location in loc])) for loc in locs], missing)
     except Exception as e:
         print(e, "Something went wrong")
         return []
-  
-    if len(locs)>1: 
-            missing = [[np.array(i[0])[np.where(np.array(i[1]) == -1)[0]] for i in zip(locs[0], alignedLocs[0])],
-                       [i[0] for i in zip(locs[1], alignedLocs[1]) if i[1]==[-1]]]
-    else: 
-        missing = []
-    return ([list(map(lambda x: seq[1][x], [list(map(lambda x: ali.trace[mainSeq.index(x-1)][1], 
-            filter(lambda x: ali.trace[mainSeq.index(x-1)][1] > -1, location))) for location in loc])) for loc in locs], missing)
 #Distance
 def calcDist(pdb, chain, entry): #returns the distances between a PDB structure's binding sites and the entry's ModifiedLocationNum for a given chain
     structure = pdb.structure
