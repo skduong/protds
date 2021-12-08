@@ -150,7 +150,7 @@ def bestPDB(protid): #return the structure with the best alignment to the row's 
     
 #Alignment
 def alignLoc(locs, protid, pdb): #get aligned positions for a list of locations
-   seq = chainSeq(checkChains(pdb, protid)[0], pdb.structure)
+    seq = chainSeq(checkChains(pdb, protid)[0], pdb.structure)
     ali = align.align_optimal(proteins[protid].getSequence(), seq[0], align.SubstitutionMatrix.std_protein_matrix())[0]
     try:
         mainSeq = [i[0] for i in ali.trace]
@@ -165,6 +165,7 @@ def alignLoc(locs, protid, pdb): #get aligned positions for a list of locations
     except Exception as e:
         print(e, "Something went wrong")
         return []
+        
 #Distance
 def calcDist(pdb, chain, entry): #returns the distances between a PDB structure's binding sites and the entry's ModifiedLocationNum for a given chain
     structure = pdb.structure
