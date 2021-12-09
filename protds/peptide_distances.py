@@ -2,7 +2,7 @@
 Get distances between a set of PeptideSequences and their overall center of mass
 Each PeptideSequence is represented by its middle letter position (closest to the left)
 '''
-from protds_17 import *
+from protds.protds_v3 import *
 
 def preProcess(data):
     '''
@@ -12,8 +12,7 @@ def preProcess(data):
     Output: filtered and sorted dataset of ProteinIDs that have results on ProteinDataBank with peptide start, end, and middle positions
     '''
     #search for the ProteinSequence and structures (takes a while)
-    ids = [i.replace(';','-').split('-')[0] for i in pd.unique(data['ProteinID'])]
-    noResults = [i for i in ids if searchPDB(i)==False]
+    noResults = [i for i in pd.unique(data['ProteinID']) if searchPDB(i.replace(';','-').split('-')[0])==False]
     df = data[~data['ProteinID'].isin(noResults)].copy()
     if 'ProteinSequence' not in data.columns:
         df['ProteinSequence'] = [proteins[i.replace(';','-').split('-')[0]].record.sequence for i in df['ProteinID'].values]
@@ -43,7 +42,7 @@ def preProcess(data):
     return df.sort_values(by='ProteinID')
     
 def pepDistances(sortedData):
-    protGroup = df.groupby('ProteinID')
+    protGroup = sortedData.groupby('ProteinID')
     dists = []
     for p in protGroup:
         entries = p[1][['ProteinID', 'PepMid']].values

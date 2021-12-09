@@ -354,7 +354,7 @@ def getDistances(row, best=True): #error handling for user input before printing
             print("There were no results for", entry[0])
         else:
             print(e, "Invalid row entry")  
- 
+
 def getEntryView(row, showChain='best', full=True): #set showChain='' to select locations on every chain, or specify a chain letter to choose one other than the 'best' aligned one
     entry = checkRow(row)
     try:
