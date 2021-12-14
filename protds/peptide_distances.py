@@ -11,7 +11,7 @@ def calculate_gravy(sequence):
     except:
         return None
 
-def preProcess(data, fasta=''):
+def preProcess(data, fasta_file_path=''):
     '''
     The starting dataset has a column of "ProteinID" and "PeptideSequence"
     If it does not provide "ProteinSequence", then one will be made
@@ -27,9 +27,10 @@ def preProcess(data, fasta=''):
             with open(fasta_file_path) as fasta_file: 
                 record_dict = SeqIO.to_dict(SeqIO.parse(fasta_file, "fasta"))
             record_dict = dict(zip([i.split('|')[1] for i in record_dict.keys()], [str(j.seq) for j in record_dict.values()]))
-            df['ProteinSequence'] = [record_dict[i] if i in record_dict else None for i in df['ProteinID'].values]
-        except:
+            df['ProteinSequence'] = [record_dict[i.split(';')[0]] if i.split(';')[0] in record_dict else None for i in df['ProteinID'].values]
+        except Exception as e:
             df['ProteinSequence'] = [proteins[i.replace(';','-').split('-')[0]].record.sequence for i in df['ProteinID'].values]
+            print("Unable to use FASTA. Sequences will be taken from UniProt records. ", e)
     #start, end, and middle positions
     seqs = df[['PeptideSequence', 'ProteinSequence']].values
     start=[]; end=[]
