@@ -63,7 +63,7 @@ def getResultCount():
     counts = [0,10,15,20,50,100]
     for i in range(len(counts)-1):
         match = len(dfResults[(dfResults['NumOfResults']>counts[i]) & (dfResults['NumOfResults']<=counts[i+1])])
-        print(counts[i], 'to', counts[i+1], "results:", match,'/', total, '=', match/total)
+        print(counts[i]+1, 'to', counts[i+1], "results:", match,'/', total, '=', match/total)
     print("over 100 results:", len(dfResults[dfResults['NumOfResults']>100]),'/',total, '=', len(dfResults[dfResults['NumOfResults']>100])/total)
 
     print("\nCumulative:")
