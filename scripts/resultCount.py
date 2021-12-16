@@ -54,7 +54,7 @@ def getResultCount():
 
     #save as csv
     dfResults = pd.DataFrame(numResults.items(), columns=['ProteinID', 'NumOfResults'])
-    dfResults.to_csv(os.path.join(pathname,fastaname[:-6]+'_count.csv'))
+    dfResults.to_csv(os.path.join(pathname,fastaname[:-6]+'_count.csv'), index=False)
 
     #print results
     total = len(dfResults)
@@ -69,7 +69,7 @@ def getResultCount():
     print("\nCumulative:")
     for i in [10,15,20,50,100]:
         print("<", i, "results:", len(dfResults[dfResults['NumOfResults']<i]),'/', total,'=', len(dfResults[dfResults['NumOfResults']<i])/total)
-    print(">=100 results:", len(dfResults[dfResults['NumOfResults']>=100]),'/',total,'=', len(dfResults[dfResults['NumOfResults']>=100])/total)
+    #print(">=100 results:", len(dfResults[dfResults['NumOfResults']>=100]),'/',total,'=', len(dfResults[dfResults['NumOfResults']>=100])/total)
     
 if __name__ == "__main__":
     getResultCount()
