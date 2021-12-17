@@ -9,11 +9,11 @@ import pandas as pd
 import os
 
 def inputCheck(instr): #handle quotations in input responses
-    checkstr = instr.replace("'", '"').split('"')
+    checkstr = instr.replace('"', "'").split("'", 1)
     if len(checkstr)==1: 
         return checkstr[0]
     else:
-        return checkstr[1]
+        return checkstr[1][:-1]
         
 def getResultCount():
     '''
@@ -43,7 +43,7 @@ def getResultCount():
     #getting result count
     pids = [i[:6] for i in data.split(">sp|")][1:]
     numResults = {}
-    for i in pids:
+    for i in pd.unique(pids):
         try:
             search_operator = text_operators.ExactMatchOperator(value= i, attribute="rcsb_polymer_entity_container_identifiers.reference_sequence_identifiers.database_accession")
             return_type = ReturnType.ENTRY
