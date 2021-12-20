@@ -41,7 +41,7 @@ def getResultCount():
         return 0
             
     #getting result count
-    pids = [i[:6] for i in data.split(">sp|")][1:]
+    pids = [i.split('|')[0].split('-')[0] for i in data.split(">sp|")][1:]
     numResults = {}
     for i in pd.unique(pids):
         try:
