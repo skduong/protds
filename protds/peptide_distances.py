@@ -118,7 +118,7 @@ def Process_File(): #copied over from the Hydrophobicity code; needs further tes
         print('\nCould not complete operation.', e)
         
 if __name__ == "__main__":
-    import protds_v3
+    from protds_v3 import *
     Process_File()
     
 else: #imported by a Jupyter Notebook
