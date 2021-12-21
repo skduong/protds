@@ -165,8 +165,8 @@ def alignLoc(locs, protid, pdb): #get aligned positions for a list of locations
     except Exception as e:
         print(e, "Something went wrong")
         return []
-        
-#Distance
+    
+#Distances
 def calcDist(pdb, chain, entry): #returns the distances between a PDB structure's binding sites and the entry's ModifiedLocationNum for a given chain
     structure = pdb.structure
     uniProtSites = proteins[entry[0]].getSites()
@@ -191,7 +191,7 @@ def printDists(entry, best): #display the results of entryDists with tables
             print("***ModifiedLocationNum", entry[1], "is missing from the structure***")
             display(pd.DataFrame())
 
-def dfDists(data): #calculate and append sites and distance information to the dataset [IN PROGRESS]
+def dfDists(data): #calculate and append sites and distance information to the dataset 
     df = data.copy()[['ProteinID', 'ModifiedLocation', 'ModifiedLocationNum']]
     noResults = [i for i in pd.unique(df['ProteinID']) if searchPDB(i)==False]
     df['HasResults'] = ~df['ProteinID'].isin(noResults)
@@ -222,11 +222,32 @@ def dfDists(data): #calculate and append sites and distance information to the d
     df['MissingSites'] = missing
     return df.drop(columns=['ModifiedLocationNum'])[['ProteinID', 'ModifiedLocation', 'HasResults', 'NumOfSites',
                                                      'Type', 'Sites', 'Distances', 'MissingSites']]
-            
-#Visualization
+                                                     
+#Visualizations
 def locToStr(locList): #locList = [[L1,L2], [L3], [etc]] 
     return ['-'.join(loc) for loc in [pd.unique([str(i[0]), str(i[-1])]).tolist() for i in locList if len(i)>0] if '[]' not in loc]
 
+def selectPDB(protein): #ask user to pick a structure if > 1 exist
+    pdbs = protein.getPDBs()
+    if len(pdbs) > 1: 
+        print("\nProtein ", protein.UniProtId, " has ", len(pdbs), " structures:\n", ''.join(i+', ' for i in pdbs)[:-2], '\n', sep='')
+        select = input("Choose one either by name or number (ex: type 2 to get the 2nd structure): ")
+        try:
+            val = int(select)
+            if val <= len(pdbs) and val > 0:
+                return int(val-1)
+            else:
+                print("Invalid selection, the first structure will be selected:\n")
+                return 0   
+        except ValueError:
+            if select.upper() in pdbs:
+                return pdbs.index(select.upper())
+            else:
+                print("Invalid PDB.", pdbs[0], "will be selected by default:\n")
+                return 0 
+    else:
+        return 0
+        
 def pdbView(protid, loc1, loc2, showChain, full): #highlight iCn3D structure with locations from loc1(red) and loc2(black)
     if protid in proteins.keys(): 
         pdb = proteins[protid].structures[selectPDB(proteins[protid])]
@@ -257,145 +278,3 @@ def pdbView(protid, loc1, loc2, showChain, full): #highlight iCn3D structure wit
     else:
         print("No results for", protid)
         return icn3dpy.view(command = 'set background white')
-        
-def selectPDB(protein): #ask user to pick a structure if > 1 exist
-    pdbs = protein.getPDBs()
-    if len(pdbs) > 1: 
-        print("\nProtein ", protein.UniProtId, " has ", len(pdbs), " structures:\n", ''.join(i+', ' for i in pdbs)[:-2], '\n', sep='')
-        select = input("Choose one either by name or number (ex: type 2 to get the 2nd structure): ")
-        try:
-            val = int(select)
-            if val <= len(pdbs) and val > 0:
-                return int(val-1)
-            else:
-                print("Invalid selection, the first structure will be selected:\n")
-                return 0   
-        except ValueError:
-            if select.upper() in pdbs:
-                return pdbs.index(select.upper())
-            else:
-                print("Invalid PDB.", pdbs[0], "will be selected by default:\n")
-                return 0 
-    else:
-        return 0
-
-# notebook use
-def modData(data): #look at only modified rows/ convert location floats to integer 
-    df = data[data['ModifiedLocationNum'].notna()].copy()
-    df['ModifiedLocationNum'] = df['ModifiedLocationNum'].astype(int)
-    return df
-    
-def getProteins(data, load_pickle=False, save_pickle=False, fname = 'proteins.pkl'):
-    if load_pickle: loadProteins() 
-    for i in data['ProteinID'].unique(): 
-        searchPDB(i)
-    if save_pickle: saveProteins() 
-
-def printSites(prot): #display active sites for a given protein
-    display(pd.DataFrame(list(zip(prot.getSites()[1], prot.getSites()[0])), columns=['Type', 'Location']))
-
-def checkRow(row): #verify rows and return [ProteinID, ModifiedLocationNum, Index] entries for easy processing
-    try:
-        if not math.isnan(row['ModifiedLocationNum']):
-            entry = [row['ProteinID'], row['ModifiedLocationNum'].astype(int), row.name]
-        else:
-            entry = [row['ProteinID'], None, row.name]
-        if entry[0] not in proteins.keys():
-            try:
-                searchPDB(entry[0])
-                return entry
-            except:
-                print("Search for", entry[0], 'failed.')
-                return ['NA', 'NA', 'NA']
-        else: 
-            return entry
-    except Exception as e: 
-        print(e, "Invalid row entry")
-        return ['NA', 'NA', 'NA']    
-
-def getPepView(protid, data, table=True, colors = ['red', 'yellow', 'blue', 'green', 'cyan'], first=False): 
-    proteinID = protid.replace(';','-').split('-')[0] #disregard character after the uniprotID
-    if proteinID not in proteins:
-        searchPDB(proteinID)
-        
-    df = data[data['ProteinID'].str.contains(protid)].copy()
-    readings = df.filter(regex='[0-9]min').apply(pd.to_numeric, errors='coerce').fillna(-1).values
-    df['Color'] = [colors[-1] if max(i)<0 else colors[:-1][list(i).index(max(i))%(len(colors)-1)] for i in readings]
-    if table: display(df)
-        
-    try:
-        if first:
-            pdb = proteins[proteinID].structures[0]
-        else:
-            pdb = proteins[proteinID].structures[selectPDB(proteins[proteinID])] 
-       
-        if len(df)>0:
-            cmd = 'color A9A9A9;'
-            for i in df[['PeptideSequence', 'Color']].values: cmd += 'select :'+ i[0] + '; color '+ i[1]+';'
-            return icn3dpy.view(q='mmdbid='+pdb.PDBid, command = cmd+';toggle highlight; view annotations; set view detailed view; set background white;')
-        else:
-            print("The input data did not contain", proteinID)
-    except:
-        print("Protein Data Bank did not have results for", proteinID)
-        
-def getDistances(row, best=True): #error handling for user input before printing
-    entry = checkRow(row)
-    try:
-        display(row.to_frame().T)
-        if entry[1]:
-            if not proteins[entry[0]].getSites()[0]:
-                print(entry[0], "did not have binding sites listed in the UniProt databases")
-            else:
-                printDists(entry, best)
-        else:
-            print("No ModifiedLocationNum found")
-    except Exception as e:
-        if entry[0] not in proteins.keys():
-            print("There were no results for", entry[0])
-        else:
-            print(e, "Invalid row entry")  
-
-def getEntryView(row, showChain='best', full=True): #set showChain='' to select locations on every chain, or specify a chain letter to choose one other than the 'best' aligned one
-    entry = checkRow(row)
-    try:
-        display(row.to_frame().T)
-        if not proteins[entry[0]].getSites()[0]:
-            print(entry[0], "did not have binding sites listed in the UniProt databases")
-        return pdbView(entry[0], proteins[entry[0]].getSites()[0], [[entry[1]]], showChain, full)
-    except Exception as e:
-        if entry[0] not in proteins.keys():
-            print("There were no results for", entry[0])
-        else:
-            print(e,"Invalid row entry")
-
-def getOutput(data, filename): #will most-likely fail for really large datasets [TESTING]
-    moddata = data[data['ModifiedLocationNum'].notna()].copy() #include only modified entries
-    moddata['ModifiedLocationNum'] = moddata['ModifiedLocationNum'].astype(int)
-    try:
-        outTable = dfDists(moddata)
-        #long table
-        outTable.explode(['Type', 'Sites', 'Distances', 'MissingSites']).to_csv(os.path.join(os.getcwd(),"output",filename+'_long.csv')) 
-        #summary table
-        outTable['MissingSites'] = [[x.tolist() for x in i if len(x)>0] for i in outTable['MissingSites']]
-        outTable.to_csv(os.path.join(os.getcwd(),"output",filename+'_summary.csv')) 
-    except Exception as e:
-        print(e)
-            
-#Email Requests
-def emailRow(row):
-    return [row['ProteinID'], row['ModifiedLocationNum'].astype(int), row.name]
-def emailView(protid, loc1, loc2, best=True): #highlights all chains, assumes 2 sets of locations provided by datasets
-    entry = [protid, 1, 2]
-    if protid in proteins.keys(): 
-        pdb = proteins[entry[0]].structures[selectPDB(proteins[entry[0]])]
-        chainSelect = '.'+checkChains(pdb, protid)[0] if best else ''
-        sites1, sites2 = [locToStr(i) for i in alignLoc([loc1, loc2], entry[0], pdb)[0]]
-        if len(sites1)>0 and len(sites2)>0: #they both have sites after alignment
-             cmd = 'select {chain}:{s1}; color 000000; select {chain}:'.format(chain = chainSelect, s1 = ','.join(
-                [i for i in sites1]))+ ','.join([i for i in sites2])+'; color FFD700;'
-        else:
-            cmd = ''
-        return icn3dpy.view(q='mmdbid='+pdb.PDBid, command = cmd+';toggle highlight; view annotations; set view detailed view; set background white')
-    else:
-        print("No results for", entry[0])
-        return icn3dpy.view()

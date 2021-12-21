@@ -1,4 +1,3 @@
-from protds.protds_v3 import *
 from Bio import SeqIO
 
 def calculate_gravy(sequence):
@@ -91,3 +90,36 @@ def pepDistances(sortedData):
     sortedData['MeanDistances'] = means
     sortedData['StdDistances'] = stds
     return sortedData
+    
+#run program in terminal:
+def Process_File(): #copied over from the Hydrophobicity code; needs further testing
+    fasta_file_path = None
+    file_directory = None
+    
+    if fasta_file_path == None: fasta_file_path = input("Please enter path to fasta file without quotations: ")
+    if not ".fasta" in fasta_file_path: fasta_file_path += ".fasta"
+    if file_directory == None: file_directory = input("Please enter path to file folder without quotations: ")
+    
+    try:
+        project_files = os.listdir(file_directory)
+        for file in project_files:
+            if file[-4:] == '.csv':
+                try:
+                    df = preProcess(pd.read_csv(os.path.join(file_directory, file)), fasta_file_path)
+                    result = pepDistances(df)
+                    result.to_csv(os.path.join(file_directory, file[:-4]+'_distances.csv'))
+                    #break
+                except Exception as e:
+                    print(e)
+                    continue
+        print('\nFile processed successfully!')
+        
+    except Exception as e:
+        print('\nCould not complete operation.', e)
+        
+if __name__ == "__main__":
+    import protds_v3
+    Process_File()
+    
+else: #imported by a Jupyter Notebook
+    from protds.protds_v3 import *
