@@ -152,4 +152,8 @@ if __name__ == "__main__":
     table1Path = inputCheck(input("Please enter the full path of Table 1: "))
     table2Path = inputCheck(input("Please enter the full path of Table 2: "))
     
+    if ".fasta" not in fastaPath: fastaPath+=".fasta"
+    if ".csv" not in table1Path: table1Path+=".csv"
+    if ".csv" not in table2Path: table2Path+=".csv"
+    
     getGRAVYdiffs(fastaPath, table1Path, table2Path)    
