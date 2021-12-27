@@ -34,12 +34,16 @@ class Protein: #each unique protein in the dataset is represented by a Protein o
         self.UniProtId = name 
         self.record = None #Uniprot features and sites
         self.structures = None
+        self.sequence = None
     
     def getPDBs(self):
         return [i.PDBid for i in self.structures] 
     
     def getSequence(self):
-        return seq.ProteinSequence(self.record.sequence.replace('U', 'X').replace('O', 'X'))
+        if self.sequence == None:
+            return seq.ProteinSequence(self.record.sequence.replace('U', 'X').replace('O', 'X'))
+        else:
+            return seq.ProteinSequence(self.sequence.replace('U', 'X').replace('O', 'X'))
     
     def getSites(self): #lists the position(s) and label of sites 
         sites = []; labels = []
@@ -78,40 +82,52 @@ def get_mmtf(pdbid): #get atom coordinates of a pdb structure from first mmtf mo
         structure = mmtf.get_structure(mmtf_file, model=1) 
     return structure 
     
-def searchPDB(id): #add a new id to the dictionary 
+def get_pdb(upid): #for a requested uniprotID, get structures list from ProteinDataBank
+    search_operator = text_operators.ExactMatchOperator(
+        value= upid.split('-')[0], 
+        attribute="rcsb_polymer_entity_container_identifiers.reference_sequence_identifiers.database_accession")
+    return_type = ReturnType.ENTRY
+    try: 
+        results = perform_search(search_operator, return_type)
+        if len(results)>15: 
+            results = []
+            for i in np.arange(1,5,0.5):
+                try: 
+                    resolution_operator = text_operators.ComparisonOperator(
+                        value=i, 
+                        attribute="rcsb_entry_info.resolution_combined", 
+                        comparison_type=text_operators.ComparisonType.LESS)
+                    both = QueryGroup(queries = [search_operator, resolution_operator], logical_operator = LogicalOperator.AND)
+                    results += perform_search_with_graph(query_object=both, return_type=return_type)
+                    if len(results)>5: break 
+                except:
+                    continue
+        return results
+    except:
+        return False
+        
+def searchPDB(id, uniprot=True, fasta=None): #add a new id to the dictionary
     global proteins
     if id not in proteins: 
         #search PDB 
-        search_operator = text_operators.ExactMatchOperator(
-            value= id, 
-            attribute="rcsb_polymer_entity_container_identifiers.reference_sequence_identifiers.database_accession")
-        return_type = ReturnType.ENTRY
-        try: 
-            results = perform_search(search_operator, return_type)
-            if len(results)>15: 
-                results = []
-                for i in np.arange(1,5,0.5):
-                    try: 
-                        resolution_operator = text_operators.ComparisonOperator(
-                            value=i, 
-                            attribute="rcsb_entry_info.resolution_combined", 
-                            comparison_type=text_operators.ComparisonType.LESS)
-                        both = QueryGroup(queries = [search_operator, resolution_operator], logical_operator = LogicalOperator.AND)
-                        results += perform_search_with_graph(query_object=both, return_type=return_type)
-                        if len(results)>5: break 
-                    except:
-                        continue            
-            proteins[id] = Protein(id)
-            #get sites from UniProt
-            handle = get_uniprot(query = id, query_type = 'ACC')
+        results = get_pdb(id) 
+        if results:
             try:
-                proteins[id].record = SwissProt.read(handle)
-                proteins[id].structures = list(map(lambda x: PDB(x, get_mmtf(x)), map(lambda x: x.split('_')[0], results))) #need list?
+                proteins[id] = Protein(id)
+                #get sites from UniProt
+                if uniprot:
+                    handle = get_uniprot(query = id, query_type = 'ACC')
+                    proteins[id].record = SwissProt.read(handle)
+                #if sequence was given in FASTA file
+                if fasta:
+                    proteins[id].sequence = fasta
+                #get coordinates from mmtf
+                proteins[id].structures = list(map(lambda x: PDB(x, get_mmtf(x)), map(lambda x: x.split('_')[0], results)))
             except Exception as e:
-                print("UniProt did not have results for ", id)
+                print("Failed to get structure data for", id)
                 print(e)
-        except: 
-            print('There were no results for', id, '\n')    
+        else: 
+            print('There were no PDB results for', id, '\n')    
             return False
 
 #Chain Info
