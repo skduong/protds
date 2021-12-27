@@ -121,6 +121,10 @@ def inputCheck(instr): #handle quotations in input responses
         return checkstr[1][:-1]
         
 def getGRAVYdiffs(fastaPath, table1Path, table2Path, save = True):
+    if ".fasta" not in fastaPath: fastaPath+=".fasta"
+    if ".csv" not in table1Path: table1Path+=".csv"
+    if ".csv" not in table2Path: table2Path+=".csv"
+    
     try: #get ProteinSequences, rename columns, and get GRAVY indexes for Table 1
         data = pd.read_csv(table1Path)
         df1 = process(data, fastaPath)
@@ -142,7 +146,7 @@ def getGRAVYdiffs(fastaPath, table1Path, table2Path, save = True):
         df3 = df2
     
     if save:
-        df3.to_csv(os.path.split(table1Path)[-1]+"_GRAVY.csv")
+        df3.to_csv(os.path.join(os.path.split(table1Path)[0], os.path.split(table1Path)[-1]+"_GRAVY.csv"))
         print("GRAVY calculations successful. New data table saved to", os.path.dirname(table1Path))
     else:
         return df3
@@ -151,9 +155,5 @@ if __name__ == "__main__":
     fastaPath = inputCheck(input("Please enter the full path of the FASTA file:"))
     table1Path = inputCheck(input("Please enter the full path of Table 1: "))
     table2Path = inputCheck(input("Please enter the full path of Table 2: "))
-    
-    if ".fasta" not in fastaPath: fastaPath+=".fasta"
-    if ".csv" not in table1Path: table1Path+=".csv"
-    if ".csv" not in table2Path: table2Path+=".csv"
     
     getGRAVYdiffs(fastaPath, table1Path, table2Path)    
