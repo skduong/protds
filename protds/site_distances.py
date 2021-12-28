@@ -119,16 +119,17 @@ def processData(filepath):
     #input handling
     if filepath==None:
         filepath = inputCheck(input("Enter the path of the csv file's folder location: "))
-        csvfiles = [i for i in os.listdir(filepath) if '.csv' in i]
-        if len(csvfiles)==1:
-            csvname = csvfiles[0]
-        elif len(csvfiles)>1:
-            csvname = inputCheck(input("More than one csv file found in that directory. Please enter the file's name: "))
-            if '.csv' not in csvname: csvname += '.csv'
-        else:
-            print("Error. No csv files detected in", filepath)
-            return 0
-            
+        
+    csvfiles = [i for i in os.listdir(filepath) if '.csv' in i]
+    if len(csvfiles)==1:
+        csvname = csvfiles[0]
+    elif len(csvfiles)>1:
+        csvname = inputCheck(input("More than one csv file found in that directory. Please enter the file's name: "))
+        if '.csv' not in csvname: csvname += '.csv'
+    else:
+        print("Error. No csv files detected in", filepath)
+        return 0
+    
     try:
         data = pd.read_csv(os.path.join(filepath,csvname))
         getOutput(data, csvname[:-4], filepath)
