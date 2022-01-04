@@ -146,7 +146,7 @@ def getGRAVYdiffs(fastaPath, table1Path, table2Path, save = True):
         df3 = df2
     
     if save:
-        df3.to_csv(os.path.join(os.path.split(table1Path)[0], os.path.split(table1Path)[-1][:-4]+"_GRAVY.csv"))
+        df3.to_csv(table1Path[:-4]+"_GRAVY.csv")
         print("GRAVY calculations successful. New data table saved to", os.path.dirname(table1Path))
     else:
         return df3
