@@ -1,6 +1,6 @@
 import os, urllib
 import pandas as pd
-from Bio import SeqIO
+from Bio import SeqIO, SwissProt
 import biotite.sequence as seq
 
 def get_uniprot (query='',query_type='ACC'): #for querying UniProtDB; returns an opened url to be used as swiss-prot handle
@@ -79,17 +79,21 @@ def gravyDiff2(table1, table2): #GRAVY of PeptideSequences from Table1 minus the
     table2PeptideSeq = "Stripped.Sequence"
     if "ProteinID" in table2.columns: table2Proteins = "ProteinID"
     if "PeptideSequence" in table2.columns: table2PeptideSeq = "PeptideSequence"
+
+    #handling isomers
+    table1['UPID'] = [i.split(';')[0] for i in table1["ProteinID"].values]
+    table2['UPID'] = [i.split(';')[0] for i in table2[table2Proteins].values]
     
-    d2 = dict(list(table2.groupby(table2Proteins)))
+    d2 = dict(list(table2.groupby('UPID')))
     diff2 = []
-    for i in table1.groupby("ProteinID"):
+    for i in table1.groupby("UPID"):
         if i[0] in d2.keys():
             minustable2 = i[1][~i[1]['PeptideSequence'].isin(d2[i[0]][table2PeptideSeq].values)]
             diff2 += [sum(minustable2['PeptideGRAVY']) for j in range(len(i[1]))]
         else:
             diff2 += [sum(i[1]['PeptideGRAVY']) for j in range(len(i[1]))]
     table1['GRAVYdifference2'] = diff2
-    return table1
+    return table1.drop('UPID', axis=1)
     
 def pepPositions(df): #adds a column of PepMid: the position number of the Peptide's middle letter (closer to the left) on the full sequence
     seqs = df[['PeptideSequence', 'ProteinSequence']].values
@@ -156,4 +160,15 @@ if __name__ == "__main__":
     table1Path = inputCheck(input("Please enter the full path of Table 1: "))
     table2Path = inputCheck(input("Please enter the full path of Table 2: "))
     
-    getGRAVYdiffs(fastaPath, table1Path, table2Path)    
+    table1diff = getGRAVYdiffs(fastaPath, table1Path, table2Path)   
+    
+    #append results to table2:
+    data2 = pd.read_csv(table2Path)
+    if "ProteinID" not in data2.columns: data2 = data2.rename(columns={"PG.UniProtIds": "ProteinID", "Stripped.Sequence": "PeptideSequence"})
+    #handling isomers:
+    table1diff["UPID"] = [i.split(';')[0] for i in table1diff["ProteinID"].values]
+    data2["UPID"] = [i.split(';')[0] for i in data2["ProteinID"].values]
+
+    subset = table1diff.drop_duplicates("UPID")[["UPID", "ProteinSequence", "SequenceGRAVY", "GRAVYdifference", "GRAVYdifference2"]]
+    table2diff = pd.merge(data2,subset, on=["UPID"], how='left')
+    table2diff.drop('UPID', axis=1).to_csv(table2Path[:-4]+'_GRAVY.csv', index=False)
