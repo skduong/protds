@@ -34,6 +34,11 @@ def getSequence(data, fasta_file_path=''): #look for FASTA file to pull sequence
         df['ProteinSequence'] = [seqs[id] if id in seqs.keys() else fetchSequence(id, seqs) for id in ids]
     return df
 
+def peptidePercentage(data): #adds a column of PeptidePercentage- length(all PeptideSequences)/ length(full ProteinSequence)
+    percentages = {p[0]: sum([len(i) for i in p[1]["PeptideSequence"].values])/len(p[1]["ProteinSequence"].values[0]) for p in data.groupby("ProteinID")}
+    data['PeptidePercentage'] = data.ProteinID.map(percentages)
+    return data
+    
 def calculate_gravy(sequence): #GRAVY score is sum of hydropathy divided by length of the sequence
     hydropathy_index = {'I':4.5, 'V':4.2, 'L':3.8,'F':2.8, 'C':2.5,'M': 1.9, 'A': 1.8, 'G': -.4, 'T': -.7, 'W': -.9, 'S': -.8,
                         'Y':-1.3, 'P':-1.6, 'H':-3.2, 'E':-3.5, 'Q':-3.5, 'D': -3.5, 'N':-3.5, 'K': -3.9, 'R': -4.5}
@@ -95,7 +100,7 @@ def gravyDiff2(table1, table2): #GRAVY of PeptideSequences from Table1 minus the
     table1['GRAVYdifference2'] = diff2
     return table1.drop('UPID', axis=1)
     
-def pepPositions(df): #adds a column of PepMid: the position number of the Peptide's middle letter (closer to the left) on the full sequence
+def pepPositions(df): #adds a column of PepMid- the position number of the Peptide's middle letter (closer to the left) on the full sequence
     seqs = df[['PeptideSequence', 'ProteinSequence']].values
     start=[]; end=[]
     for i in seqs: 

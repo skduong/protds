@@ -167,7 +167,11 @@ def bestPDB(protid): #return the structure with the best alignment to the row's 
 #Alignment
 def alignLoc(locs, protid, pdb): #get aligned positions for a list of locations
     seq = chainSeq(checkChains(pdb, protid)[0], pdb.structure)
-    ali = align.align_optimal(proteins[protid].getSequence(), seq[0], align.SubstitutionMatrix.std_protein_matrix())[0]
+    protLen = len(proteins[protid].getSequence())
+    if len(seq[0]) in range(int(protLen-protLen*.1), int(protLen+protLen*.1)):
+        ali = align.align_optimal(proteins[protid].getSequence(), seq[0], align.SubstitutionMatrix.std_protein_matrix())[0]
+    else:
+        ali = align.align_optimal(proteins[protid].getSequence(), seq[0], align.SubstitutionMatrix.std_protein_matrix(), local=True)[0]
     try:
         mainSeq = [i[0] for i in ali.trace]
         alignedLocs = [[list(map(lambda x: ali.trace[mainSeq.index(x-1)][1], location)) for location in loc] for loc in locs]
