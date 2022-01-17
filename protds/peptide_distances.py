@@ -24,7 +24,7 @@ def alignPep(proteinGroup, getCenters = True): #getCenters: return only the cent
 def pepCenterDist(sortedData, getNoResults=False):
     '''
     Get distances between a set of PeptideSequences and their overall center of mass
-    Each PeptideSequence is represented by its middle letter position (closest to the left)
+    Each PeptideSequence is represented by the coordinates of its middle letter position (closest to the left)
     '''
     #search for Protein structures (takes a while)
     uniqueIDs = sortedData.drop_duplicates(["ProteinID"])[["ProteinID", "ProteinSequence"]].values
@@ -52,7 +52,123 @@ def pepCenterDist(sortedData, getNoResults=False):
    
     if getNoResults: return sortedData, noResults
     else: return sortedData
-        
+    
+def perpDist(params, xyz):
+    a, b, c, d = params
+    x, y, z = xyz
+    return np.abs(a * x + b * y + c * z + d) / np.sqrt(a**2 + b**2 + c**2)
+
+def planeSVD(X, p=[]): #X is a set of (X,Y,Z) points; p is a point the plane passes through
+    """
+    Singular value decomposition method.
+    Source: https://gist.github.com/lambdalisue/7201028
+    """
+    # Find the average of points (centroid) along the columns
+    C = np.average(X, axis=0)
+    # Create CX vector (centroid to point) matrix
+    CX = X - C
+    # Singular value decomposition
+    U, S, V = np.linalg.svd(CX)
+    # The last row of V matrix indicate the eigenvectors of smallest eigenvalues (singular values)
+    N = V[-1]
+
+    # Extract a, b, c, d coefficients.
+    x0, y0, z0 = p if len(p) !=0 else C
+    a, b, c = N
+    d = -(a * x0 + b * y0 + c * z0) 
+    
+    return a, b, c, d
+
+def pepPlane(proteinGroup, customPoint=False, returnP=False):
+    #coordinates for each sequence
+    xyz = alignPep(proteinGroup)
+    points = [i for i in xyz if len(i)>0]
+    
+    if len(points) == 0:
+        return None, xyz
+    if len(points) >3 and customPoint: #(if there are <3 points, the optimal plane goes through every point)
+        try:
+            pindex = np.nanargmax(np.delete(proteinGroup[1]['1st 15min'].tolist(), [i[0] for i in enumerate(xyz) if len(i[1])==0]))
+            p = points[pindex]
+            points = [points[i] for i in range(len(points)) if i!=pindex]
+        except:
+            print(proteinGroup[0],"had no '1st 15min' readings. Failed to find point of highest intensity.")
+            p=[]
+    else: p = []
+    
+    #get optimized plane with SingularValueDecomposition
+    x,y,z = [np.array(i) for i in zip(*points)]
+    if returnP: 
+        return planeSVD(np.array([x, y, z]).T, p), xyz, (points,p)
+    else:
+        return planeSVD(np.array([x, y, z]).T, p), xyz
+ 
+def pepPlaneDist(sortedData, customPoint=False):
+    '''
+    Get distances between a set of PeptideSequences and a Plane fitted through them
+    Each PeptideSequence is represented by the coordinates of its middle letter position (closest to the left)
+    The Plane is optimized through SingularValueDecomposition, which minimizes the perpendicular distances between it and the Peptides
+    If customPoint=True, then the Plane will pass through the PeptideSequence with the highest 1st 15min intensity
+    '''
+    #searching for Protein results/coordinates
+    uniqueIDs = sortedData.drop_duplicates(["ProteinID"])[["ProteinID", "ProteinSequence"]].values
+    noResults = [i[0] for i in uniqueIDs if searchPDB(i[0].split(';')[0], False, i[1])==False]
+    sortedData = sortedData[~sortedData['ProteinID'].isin(noResults)]
+    protGroup = sortedData.groupby('ProteinID')
+    
+    planeDists = []
+    if customPoint: #highest intensity one as p
+        for g in protGroup:
+            plane = pepPlane(g, True)
+            if not plane[0]:
+                planeDists += ['NA' for i in plane[1]]
+                continue
+            else:
+                allx, ally, allz = [np.array(i) for i in zip(*[i if len(i)>0 else np.array([np.nan, np.nan, np.nan]) for i in plane[1]])]
+                planeDists += [i if not np.isnan(i) else "Missing" for i in perpDist(plane[0], (allx,ally,allz))]
+    else:
+        for g in protGroup:
+            plane = pepPlane(g, False)
+            if not plane[0]:
+                planeDists += ['NA' for i in plane[1]]
+                continue
+            else:
+                #get distances from the plane
+                allx, ally, allz = [np.array(i) for i in zip(*[i if len(i)>0 else np.array([np.nan, np.nan, np.nan]) for i in plane[1]])]
+                planeDists += [i if not np.isnan(i) else "Missing" for i in perpDist(plane[0], (allx,ally,allz))]
+    
+    sortedData["DistanceToPlane"] = planeDists
+    return sortedData 
+
+def plotPlane1(proteinGroup):
+    from mpl_toolkits.mplot3d import Axes3D
+    import matplotlib.pyplot as plt
+    
+    plane = pepPlane(proteinGroup, True, True)
+    x,y,z = [np.array(i) for i in zip(*[i for i in plane[2][0] if len(i)>0])]
+    p = plane[2][1]
+    
+    plt.figure()
+    ax = plt.subplot(111, projection='3d')
+    ax.scatter(x, y, z, color='b')
+    ax.scatter(p[0], p[1], p[2], color='r')
+
+    # plot plane
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+    X,Y = np.meshgrid(np.arange(xlim[0], xlim[1]),
+                      np.arange(ylim[0], ylim[1]))
+                      
+    normal = plane[0][:-1]
+    Z = (-normal[0] * X - normal[1] * Y - plane[0][-1]) * 1. /normal[2]
+
+    ax.plot_wireframe(X,Y,Z, color='k')
+
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
+    plt.show()
+
 def getDistances():
     return 0 #working on it
     

@@ -53,7 +53,7 @@ def process(data, fastaPath, protIDs = "PG.UniProtIds", pepSeqs = "PEP.StrippedS
     '''
     The input data should have columns named "ProteinID" and "PeptideSequence" 
     By default, it will be assumed that "PG.UniProtIds" and "PEP.StrippedSequence" are possible column names (change these to accommodate your dataset)
-    this function gives the data columns a consistant naming convention and adds a column of ProteinSequence if it doesn't exist
+    This function gives the data columns a consistant naming convention and adds a column of ProteinSequence if it doesn't exist
     Output: dataset sorted by ProteinIDs with the following additional columns:
         - PeptideGRAVY: the GRAVY index of the peptide subsequence
         - SequenceGRAVY: the GRAVY index of the ProteinSequence
