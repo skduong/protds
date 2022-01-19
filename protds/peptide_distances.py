@@ -169,6 +169,26 @@ def plotPlane1(proteinGroup):
     ax.set_zlabel('z')
     plt.show()
 
+def getCenterDistByTime(filename, df, times):
+    #All Times:
+    alltimes = pepCenterDist(peptidePercentage(gravyDiff(df)), True) 
+    alltimes[0].drop("PepMid", axis=1).to_csv(os.path.join("output","AllTimes"+filename))
+    summary = pd.DataFrame(pd.unique(alltimes[0]["ProteinID"]), columns=["ProteinID"])
+
+    #Separate Times:
+    df = df[~df['ProteinID'].isin(alltimes[1])]
+    for i in times:
+        subset = pepCenterDist(peptidePercentage(gravyDiff(df[df[i].notna()])))
+        subset.drop([t for t in times if t!=i]+["PepMid"], axis=1).to_csv(os.path.join("output",i+filename))
+        subset.drop_duplicates(subset=['ProteinID'])
+        #summary table:
+        for col in ['GRAVYdifference', 'PeptidePercentage', 'MeanDistances', 'StdDistances']:
+            summary[i+col] = summary.ProteinID.map(dict(zip(subset["ProteinID"], subset[col].values)))
+    for col in ['GRAVYdifference', 'PeptidePercentage', 'MeanDistances', 'StdDistances']:
+        summary["AllTimes"+col] = summary.ProteinID.map(dict(zip(alltimes[0]["ProteinID"], alltimes[0][col].values)))
+    summary.to_csv(os.path.join("output","Summary"+filename), index=False)
+    print("Center of Mass distances for all times have been successfully calculated.")
+        
 def getDistances():
     return 0 #working on it
     

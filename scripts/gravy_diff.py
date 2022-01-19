@@ -54,8 +54,7 @@ def process(data, fastaPath, protIDs = "PG.UniProtIds", pepSeqs = "PEP.StrippedS
     The input data should have columns named "ProteinID" and "PeptideSequence" 
     By default, it will be assumed that "PG.UniProtIds" and "PEP.StrippedSequence" are possible column names (change these to accommodate your dataset)
     This function gives the data columns a consistant naming convention and adds a column of ProteinSequence if it doesn't exist
-    Output: dataset sorted by ProteinIDs with the following additional columns:
-        - PeptideGRAVY: the GRAVY index of the peptide subsequence
+    Output: dataset sorted by ProteinIDs with the following additional column:
         - SequenceGRAVY: the GRAVY index of the ProteinSequence
     '''
     #preprocessing 
@@ -66,14 +65,14 @@ def process(data, fastaPath, protIDs = "PG.UniProtIds", pepSeqs = "PEP.StrippedS
         df = getSequence(df, fastaPath)
     #GRAVY 
     df['SequenceGRAVY'] = [calculate_gravy(seq) for seq in df['ProteinSequence'].values]
-    df['PeptideGRAVY'] = [calculate_gravy(seq) for seq in df['PeptideSequence'].values]
     
     return df.sort_values(by='ProteinID')
     
 def gravyDiff(sortedData): #GRAVY of proteinSequence-peptideSubsequences
     gravDiff = [] 
     for p in sortedData.groupby('ProteinID'):
-        gravDiff += [p[1]['SequenceGRAVY'].values[0] - sum(p[1]['PeptideGRAVY']) for i in range(len(p[1]))]
+        diff = p[1]['SequenceGRAVY'].values[0] - calculate_gravy(''.join(p[1]["PeptideSequence"]))
+        gravDiff += [diff for i in range(len(p[1]))]
     sortedData['GRAVYdifference'] = gravDiff
     return sortedData
     
@@ -94,9 +93,11 @@ def gravyDiff2(table1, table2): #GRAVY of PeptideSequences from Table1 minus the
     for i in table1.groupby("UPID"):
         if i[0] in d2.keys():
             minustable2 = i[1][~i[1]['PeptideSequence'].isin(d2[i[0]][table2PeptideSeq].values)]
-            diff2 += [sum(minustable2['PeptideGRAVY']) for j in range(len(i[1]))]
+            subsetdiff = calculate_gravy(''.join(minustable2["PeptideSequence"]))
+            diff2 += [subsetdiff for j in range(len(i[1]))]
         else:
-            diff2 += [sum(i[1]['PeptideGRAVY']) for j in range(len(i[1]))]
+            subsetdiff = calculate_gravy(''.join(i[1]["PeptideSequence"]))
+            diff2 += [subsetdiff for j in range(len(i[1]))]
     table1['GRAVYdifference2'] = diff2
     return table1.drop('UPID', axis=1)
     
@@ -155,7 +156,7 @@ def getGRAVYdiffs(fastaPath, table1Path, table2Path, save = True):
         df3 = df2
     
     if save:
-        df3.to_csv(table1Path[:-4]+"_GRAVY.csv")
+        df3.drop("PepMid", axis=1).to_csv(table1Path[:-4]+"_GRAVY.csv")
         print("GRAVY calculations successful. New data table saved to", os.path.dirname(table1Path))
         
     return df3
