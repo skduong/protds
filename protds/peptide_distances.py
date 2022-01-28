@@ -11,8 +11,7 @@ def alignPep(proteinGroup, getCenters = True): #getCenters: return only the cent
     else:
         ali = align.align_optimal(proteins[protid].getSequence(), seq[0], align.SubstitutionMatrix.std_protein_matrix(), local=True)[0]
     mainseq = [i[0] for i in ali.trace]
-    alignedseq = [seq[1][ali.trace[mainseq.index(i)][1]] if i in mainseq else -1 for i in proteinGroup[1]["PepMid"].values]
-    alignedseq = map(lambda x: seq[1][x] if x!=-1 else x, [ali.trace[mainseq.index(i)][1] if i in mainseq else -1 for i in proteinGroup[1]["PepMid"].values])
+    alignedseq = map(lambda x: seq[1][x] if x!=-1 else -111, [ali.trace[mainseq.index(i)][1] if i in mainseq else -1 for i in proteinGroup[1]["PepMid"].values])
     structure = pdb.structure
     coords = [structure[(structure.chain_id==pdb.bestChain[0]) & (structure.res_id==i)] for i in alignedseq]
     
@@ -58,6 +57,11 @@ def perpDist(params, xyz):
     x, y, z = xyz
     return np.abs(a * x + b * y + c * z + d) / np.sqrt(a**2 + b**2 + c**2)
 
+def angle(n1, n2, complement=False): #input: normal of plane1 (a1,b1,c1) and normal of plane2 (a2,b2,c2)
+    dot = np.abs(np.dot(n1,n2)) if complement else np.dot(n1,n2)
+    angle = np.arccos(dot / (np.linalg.norm(n1) * np.linalg.norm(n2)))
+    return angle*180/np.pi #return angle in degrees
+    
 def planeSVD(X, p=[]): #X is a set of (X,Y,Z) points; p is a point the plane passes through
     """
     Singular value decomposition method.
@@ -188,6 +192,29 @@ def getCenterDistByTime(filename, df, times):
         summary["AllTimes"+col] = summary.ProteinID.map(dict(zip(alltimes[0]["ProteinID"], alltimes[0][col].values)))
     summary.to_csv(os.path.join("output","Summary"+filename), index=False)
     print("Center of Mass distances for all times have been successfully calculated.")
+        
+def getAngles(data1, data2):
+    #handling isomers:
+    data1["UPID"] = [i.split(';')[0] for i in data1["ProteinID"].values]
+    data2["UPID"] = [i.split(';')[0] for i in data2["ProteinID"].values]
+    both = data1[data1["UPID"].isin(data2["UPID"])]
+    
+    angles = {}
+    for protein in pd.unique(both["UPID"]):
+        #pull struc info
+        if searchPDB(protein, False, data1[data1["UPID"]==protein].ProteinSequence.values[0]) != False:
+            try: 
+                n1 = pepPlane((protein, data1[data1["UPID"]==protein]), True)[0][:3]
+                n2 = pepPlane((protein, data2[data2["UPID"]==protein]), False)[0][:3]
+                angles[protein] = angle(n1, n2)
+            except Exception as e:
+                print(protein, e)
+                angles[protein]= 'NA'
+        else:
+            angles[protein] = 'No PDB result'
+            
+    data2['angles'] = data2.UPID.map(angles)
+    return data2.drop("UPID", axis=1)
         
 def getDistances():
     return 0 #working on it
