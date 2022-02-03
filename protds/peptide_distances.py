@@ -194,27 +194,38 @@ def getCenterDistByTime(filename, df, times):
     print("Center of Mass distances for all times have been successfully calculated.")
         
 def getAngles(data1, data2):
+    '''
+    data1 corresponds to the dataset used for Plane1, which crossed through the point of highest 1st15min intensity
+    data2 corresponds to the dataset used for Plane2, which was not required to pass through any particular point
+    '''
     #handling isomers:
-    data1["UPID"] = [i.split(';')[0] for i in data1["ProteinID"].values]
-    data2["UPID"] = [i.split(';')[0] for i in data2["ProteinID"].values]
+    if "UPID" not in data1.columns or "UPID" not in data2.columns:
+        data1["UPID"] = [i.split(';')[0] for i in data1["ProteinID"].values]
+        data2["UPID"] = [i.split(';')[0] for i in data2["ProteinID"].values]
     both = data1[data1["UPID"].isin(data2["UPID"])]
     
     angles = {}
     for protein in pd.unique(both["UPID"]):
+        #print(protein)
         #pull struc info
         if searchPDB(protein, False, data1[data1["UPID"]==protein].ProteinSequence.values[0]) != False:
-            try: 
-                n1 = pepPlane((protein, data1[data1["UPID"]==protein]), True)[0][:3]
-                n2 = pepPlane((protein, data2[data2["UPID"]==protein]), False)[0][:3]
-                angles[protein] = angle(n1, n2)
-            except Exception as e:
-                print(protein, e)
-                angles[protein]= 'NA'
+            p1 = pepPlane((protein, data1[data1["UPID"]==protein]), True)[0]
+            p2 = pepPlane((protein, data2[data2["UPID"]==protein]), False)[0]
+            try:
+                if sum(np.cross(p1[:3], p2[:3])==[0,0,0]) == 3: #parallel planes
+                    angles[protein] = "NAN"
+                else: 
+                    angles[protein] = angle(p1[:3], p2[:3])
+            except:
+                if not p1 and not p2: angles[protein] = "Planes1&2 NA"
+                elif not p1: angles[protein] = "Plane1 NA"
+                elif not p2: angles[protein] = "Plane2 NA"
+                else: angles[protein] = "NA"    
         else:
             angles[protein] = 'No PDB result'
             
-    data2['angles'] = data2.UPID.map(angles)
-    return data2.drop("UPID", axis=1)
+    data1['angles'] = data1.UPID.map(angles)
+    return data1.drop("UPID", axis=1)
         
 def getDistances():
     return 0 #working on it
