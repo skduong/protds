@@ -9,15 +9,15 @@ import biotite.structure as struc
 import biotite.database.rcsb as rcsb
 import biotite.sequence.align as align
 import biotite.structure.io.mmtf as mmtf
+import biotite.structure.io.pdbx as pdbx
 #Bio: access UniProt's site information
 from Bio.SeqFeature import FeatureLocation
 from Bio import SwissProt
 #general utilities
-import pickle
 import numpy as np
 import pandas as pd
 from IPython.display import display
-import os, math, urllib, icn3dpy, warnings
+import os, io, urllib, requests, icn3dpy, warnings, pickle
 from tempfile import gettempdir, NamedTemporaryFile, TemporaryDirectory
 warnings.filterwarnings(action='once')
 
@@ -33,8 +33,9 @@ class Protein: #each unique protein in the dataset is represented by a Protein o
     def __init__(self, name):
         self.UniProtId = name 
         self.record = None #Uniprot features and sites
-        self.structures = None
+        self.structures = None #PDB structures
         self.sequence = None
+        self.predicted = None #predicted AlphaFold structure
     
     def getPDBs(self):
         return [i.PDBid for i in self.structures] 
@@ -55,6 +56,13 @@ class Protein: #each unique protein in the dataset is represented by a Protein o
         
     def getStrucs(self):
         return [i.structure for i in self.structures]
+        
+    def getPredictedStrucs(self):
+        if self.predicted:
+            return self.predicted
+        else:
+            self.predicted = get_alphafold(self.UniProtId)
+            return self.predicted
 
 #Save Proteins dictionary
 def saveProteins(fname = 'proteins.pkl'):
@@ -74,14 +82,7 @@ def get_uniprot (query='',query_type='ACC'): #for querying UniProtDB; returns an
     data = urllib.parse.urlencode(params).encode('ascii')
     request = urllib.request.Request(url, data)
     return urllib.request.urlopen(request, timeout=20)
-       
-def get_mmtf(pdbid): #get atom coordinates of a pdb structure from first mmtf model; returns a biotite AtomArray 
-    with TemporaryDirectory() as tempdir:
-        mmtf_file_path = rcsb.fetch(pdbid, "mmtf", os.path.join(gettempdir(), tempdir))
-        mmtf_file = mmtf.MMTFFile.read(mmtf_file_path)
-        structure = mmtf.get_structure(mmtf_file, model=1) 
-    return structure 
-    
+           
 def get_pdb(upid): #for a requested uniprotID, get structures list from ProteinDataBank
     search_operator = text_operators.ExactMatchOperator(
         value= upid.split('-')[0], 
@@ -106,28 +107,57 @@ def get_pdb(upid): #for a requested uniprotID, get structures list from ProteinD
     except:
         return False
         
+def get_mmtf(pdbid): #get atom coordinates of a pdb structure from first mmtf model; returns a biotite AtomArray 
+    with TemporaryDirectory() as tempdir:
+        mmtf_file_path = rcsb.fetch(pdbid, "mmtf", os.path.join(gettempdir(), tempdir))
+        mmtf_file = mmtf.MMTFFile.read(mmtf_file_path)
+        structure = mmtf.get_structure(mmtf_file, model=1) 
+    return structure 
+
+def get_alphafold(upid): #get AlphaFoldDB predicted structures; returns a biotite array
+    upid = upid.split('-')[0] #AlphaFoldDB currently doesn't support isoforms
+    #get metadata
+    url = 'https://alphafold.ebi.ac.uk/api/prediction/'+upid
+    try:
+        request = urllib.request.Request(url)
+        response = urllib.request.urlopen(request, timeout=20).read().decode('utf-8')
+        #get cif file
+        cifUrl = response[response.find('cifUrl'):].split('"')[2]
+        content = requests.get(cifUrl).text
+        file = io.StringIO(content)
+        cif_file = pdbx.PDBxFile.read(file)
+        structure = pdbx.get_structure(cif_file)
+        return structure[0]
+    except urllib.error.URLError as e:
+        print(e, upid)
+        return False
+ 
 def searchPDB(id, uniprot=True, fasta=None): #add a new id to the dictionary
     global proteins
     if id not in proteins: 
-        #search PDB 
-        results = get_pdb(id) 
-        if results:
-            try:
-                proteins[id] = Protein(id)
-                #get sites from UniProt
-                if uniprot:
-                    handle = get_uniprot(query = id, query_type = 'ACC')
-                    proteins[id].record = SwissProt.read(handle)
-                #if sequence was given in FASTA file
-                if fasta:
-                    proteins[id].sequence = fasta
-                #get coordinates from mmtf
+        try: #create new Protein entry
+            proteins[id] = Protein(id) 
+            #get sites from UniProt
+            if uniprot:
+                handle = get_uniprot(query = id, query_type = 'ACC')
+                proteins[id].record = SwissProt.read(handle)
+            if fasta:
+                proteins[id].sequence = fasta
+  
+            results = get_pdb(id.split('-')[0])
+            if results: #then get coordinates from mmtf
                 proteins[id].structures = list(map(lambda x: PDB(x, get_mmtf(x)), map(lambda x: x.split('_')[0], results)))
-            except Exception as e:
-                print("Failed to get structure data for", id)
-                print(e)
-        else: 
-            print('There were no PDB results for', id, '\n')    
+            else: #get the prediction if no PDB results exist
+                print("AlphaFold predictions will be used for", id, '\n')
+                prediction = get_alphafold(id.split('-')[0])
+                if prediction: 
+                    proteins[id].predicted = prediction
+                else: 
+                    print("Failed to get prediction for", id)
+                    del proteins[id]
+                    return False
+        except Exception as e:
+            print("Failed to get structure data for", id, e)
             return False
 
 #Chain Info
@@ -163,7 +193,7 @@ def checkChains(pdb, protid): #assign the chain with highest alignment score
 
 def bestPDB(protid): #return the structure with the best alignment to the row's Protein sequence
     return proteins[protid].structures[np.argmax([i[1] for i in [checkChains(x, protid) for x in proteins[protid].structures]])]
-    
+   
 #Alignment
 def alignLoc(locs, protid, pdb): #get aligned positions for a list of locations
     seq = chainSeq(checkChains(pdb, protid)[0], pdb.structure)

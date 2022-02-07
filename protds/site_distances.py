@@ -157,10 +157,10 @@ def emailView(protid, loc1, loc2, best=True): #highlights all chains, assumes 2 
         return icn3dpy.view()
 
 if __name__ == "__main__":
-    from protds_v3 import *
+    from protds import *
     path = None #can hard-code a path to avoid being asked every run
     #loadProteins()
     processData(path)
     
 else: #imported by a Jupyter Notebook
-    from protds.protds_v3 import *
+    from protds.protds import *

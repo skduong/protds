@@ -1,5 +1,4 @@
 import os, urllib
-import numpy as np
 import pandas as pd
 from Bio import SeqIO, SwissProt
 import biotite.sequence as seq
@@ -73,8 +72,8 @@ def filterSequences(data, n=4): #keep only ProteinIDs that have more than n uniq
     df = data.drop_duplicates(["ProteinID", "PeptideSequence"])
     counts = df["ProteinID"].value_counts()
     under = counts[counts<n].index
-    exclude = df[np.isin(df["ProteinID"],(under))]
-    keep = df[~np.isin(df["ProteinID"],(under))]
+    exclude = df[df['ProteinID'].isin(under)]
+    keep = df[~df['ProteinID'].isin(under)]
     return keep, exclude
     
 def gravyDiff(sortedData): #GRAVY of proteinSequence-peptideSubsequences
