@@ -35,7 +35,7 @@ def getOutput(filename):
     try:
         if extension.lower() == ".tsv":
             process(pd.read_csv(filename, sep='\t')).to_csv(filepath+"_reformatted.tsv", sep='\t', index=False)
-        elif extension.lower() == "csv":
+        elif extension.lower() == ".csv":
             process(pd.read_csv(filename)).to_csv(filepath+"_reformatted.csv", index=False)
         else: 
             process(pd.read_excel(filename)).to_excel(filepath+'_reformatted'+extension, index=False)
