@@ -30,12 +30,12 @@ def getOutput(filename):
     filepath, extension = os.path.splitext(filename)
     try:
         if extension.lower() == ".tsv":
-            process(pd.read_csv(filename, sep='\t')).to_csv(filepath+"_reformated.tsv", sep='\t', index=False)
+            process(pd.read_csv(filename, sep='\t')).to_csv(filepath+"_reformatted.tsv", sep='\t', index=False)
         elif extension.lower() == "csv":
-            process(pd.read_csv(filename)).to_csv(filepath+"_reformated.csv", index=False)
+            process(pd.read_csv(filename)).to_csv(filepath+"_reformatted.csv", index=False)
         else: 
-            process(pd.read_excel(filename)).to_excel(filepath+'_reformated'+extension, index=False)
-        print(filepath.split('/')[-1]+extension, "has been sucessfully reformated!")
+            process(pd.read_excel(filename)).to_excel(filepath+'_reformatted'+extension, index=False)
+        print(filepath.split('/')[-1]+extension, "has been successfully reformatted!")
     except:
         print("Unrecognized file type. Try csv, tsv, or excel files.")
         return 0
