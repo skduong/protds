@@ -69,10 +69,13 @@ def pepCenterDist(sortedData, getNoResults=False):
     if getNoResults: return sortedData, noResults
     else: return sortedData
     
-def perpDist(params, xyz):
+def perpDist(params, xyz, abs=True):
     a, b, c, d = params
     x, y, z = xyz
-    return np.abs(a * x + b * y + c * z + d) / np.sqrt(a**2 + b**2 + c**2)
+    if abs:
+        return np.abs(a * x + b * y + c * z + d) / np.sqrt(a**2 + b**2 + c**2)
+    else:
+        return (a * x + b * y + c * z + d) / np.sqrt(a**2 + b**2 + c**2)
 
 def angle(n1, n2, complement=False): #input: normal of plane1 (a1,b1,c1) and normal of plane2 (a2,b2,c2)
     dot = np.abs(np.dot(n1,n2)) if complement else np.dot(n1,n2)
