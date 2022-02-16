@@ -1,3 +1,7 @@
+"""
+Please make sure the data has the following column names:
+“Assigned Modifications”, "Start", "Protein ID", "Gene", "Protein Description"
+"""
 from tkinter import Tk 
 from tkinter.filedialog import askopenfilename
 import pandas as pd
