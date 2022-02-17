@@ -3,14 +3,6 @@ from tkinter.filedialog import askopenfilename
 import pandas as pd
 import os
 
-def process(data):
-    if all(label in data.columns for label in ["Assigned Modifications", "Start", "Protein ID", "Gene", "Protein Description"]):
-        return process1(data)
-    elif all(label in data.columns for label in ["EG.ProteinPTMLocations", "EG.ModifiedSequence", "PEP.PeptidePosition", "PG.UniProtIds", "PG.Genes"]):
-        return processDIA(data)
-    else:
-        return None
-
 def process1(data):
     """
     Please make sure the data has the following column names:
@@ -66,6 +58,14 @@ def processDIA(data):
     group = df.groupby(["PG.UniProtIds", "PG.Genes", "Modification Type", "Modification Location", "Modification Amino Acid"], as_index=False)
     return group[cols].agg('sum') 
     
+def process(data):
+    if all(label in data.columns for label in ["Assigned Modifications", "Start", "Protein ID", "Gene", "Protein Description"]):
+        return process1(data)
+    elif all(label in data.columns for label in ["EG.ProteinPTMLocations", "EG.ModifiedSequence", "PEP.PeptidePosition", "PG.UniProtIds", "PG.Genes"]):
+        return processDIA(data)
+    else:
+        return None
+
 def getOutput(filename):
     filepath, extension = os.path.splitext(filename)
     try:
