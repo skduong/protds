@@ -110,7 +110,8 @@ def pepPlane(proteinGroup, customPoint=False, returnP=False):
         return None, xyz, pdb
     if len(points) >3 and customPoint: #(if there are <3 points, the optimal plane goes through every point)
         try:
-            pindex = np.nanargmax(np.delete(proteinGroup[1]['1st 15min'].tolist(), [i[0] for i in enumerate(xyz) if len(i[1])==0]))
+            colName = [i for i in proteinGroup[1].columns if ("1st15min" in i or "1st 15min" in i)][0]
+            pindex = np.nanargmax(np.delete(proteinGroup[1][colName].tolist(), [i[0] for i in enumerate(xyz) if len(i[1])==0]))
             p = points[pindex]
             points = [points[i] for i in range(len(points)) if i!=pindex]
         except:
