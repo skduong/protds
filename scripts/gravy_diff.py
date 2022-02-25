@@ -3,6 +3,11 @@ import pandas as pd
 from Bio import SeqIO, SwissProt
 import biotite.sequence as seq
 
+"""
+This script contains general data preprocessing functions, mostly involving sequences
+and GRAVY
+"""
+
 def get_uniprot (query='',query_type='ACC'): #for querying UniProtDB; returns an opened url to be used as swiss-prot handle
     url = 'https://www.uniprot.org/uploadlists/'
     params = {'from':query_type, 'to':'ACC', 'format': 'txt', 'query':query}
@@ -130,13 +135,6 @@ def pepPositions(df): #adds a column of PepMid- the position number of the Pepti
     df['PepMid'] = [i[0]+int((i[1]-i[0])/2) for i in df[['PepStart', 'PepEnd']].values]
     
     return df.drop(['PepStart', 'PepEnd'], axis=1)
-    
-def inputCheck(instr): #handle quotations in input responses
-    checkstr = instr.replace('"', "'").split("'", 1)
-    if len(checkstr)==1: 
-        return checkstr[0]
-    else:
-        return checkstr[1][:-1]
         
 def getGRAVYdiffs(fastaPath, table1Path, table2Path, save = True):
     if ".fasta" not in fastaPath: fastaPath+=".fasta"
@@ -168,6 +166,39 @@ def getGRAVYdiffs(fastaPath, table1Path, table2Path, save = True):
         print("GRAVY calculations successful. New data table saved to", os.path.dirname(table1Path))
         
     return df3
+    
+def intensitySummary(classdict, intensityDf, df):
+    '''
+    classdict: a dictonary containing {ProteinID: classification label}
+    intensityDF: a dataframe with columns: ["PG.UniProtIds" and "Average intensity"]
+    df: a dataframe with columns: ["ProteinID", "SequenceGRAVY", "Structure", "GRAVYdifference", "PeptidePercentage", "DistanceToPlane"]
+
+    This function aggregates df's results by ProteinID, adding the following columns:
+     - "Classification": mapping of classdict labels to each ProteinID
+     - "Average DistanceToPlane": average of sequence "DistanceToPlane" for each ProteinID
+     - "Average Intensity": joins "Average intensity" readings in intensityDF to df by matching ProteinIDs
+    '''
+    #classifications
+    pat = r'({})'.format('|'.join(classdict.keys()))
+    extracted = df['Protein.Ids'].str.extract(pat, expand=False).dropna()
+    df['Classification'] = extracted.apply(lambda x: classdict[x]).reindex(df.index)
+
+    #avg intensities
+    intensdict = dict(zip(intensityDf['Protein.Ids'], intensityDf['Average intensity']))
+    match = {i:key for key in intensdict.keys() for i in df["ProteinID"] if any([n in key for n in i.split(';')])}
+    df['Average Intensity'] = df["ProteinID"].apply(lambda x: intensdict[match[x]])
+
+    #avg distances
+    df['DistanceToPlane'] = pd.to_numeric(df.DistanceToPlane, errors='coerce')
+    summary = df.groupby(["ProteinID", "SequenceGRAVY"]+list(df.columns[-5:]), as_index=False)[['DistanceToPlane']].mean()
+    return summary.rename(columns={"DistanceToPlane": "Average DistanceToPlane"})
+
+def inputCheck(instr): #handle quotations in input responses
+    checkstr = instr.replace('"', "'").split("'", 1)
+    if len(checkstr)==1: 
+        return checkstr[0]
+    else:
+        return checkstr[1][:-1]
     
 if __name__ == "__main__":
     fastaPath = inputCheck(input("Please enter the full path of the FASTA file:"))
