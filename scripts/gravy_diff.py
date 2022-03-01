@@ -180,7 +180,7 @@ def intensitySummary(classdict, intensityDf, df):
     '''
     #classifications
     pat = r'({})'.format('|'.join(classdict.keys()))
-    extracted = df['Protein.Ids'].str.extract(pat, expand=False).dropna()
+    extracted = df["ProteinID"].str.extract(pat, expand=False).dropna()
     df['Classification'] = extracted.apply(lambda x: classdict[x]).reindex(df.index)
 
     #avg intensities
