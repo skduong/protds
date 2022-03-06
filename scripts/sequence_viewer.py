@@ -66,7 +66,10 @@ def getPepView(protid, data, table=True, colors = ['red', 'yellow', 'blue', 'gre
         
     df = data[data['ProteinID'].str.contains(protid)].copy()
     readings = df.filter(regex='[0-9]min').apply(pd.to_numeric, errors='coerce').fillna(-1).values
-    df['Color'] = [colors[-1] if max(i)<0 else colors[:-1][list(i).index(max(i))%(len(colors)-1)] for i in readings]
+    if readings.shape[1]==0:
+        df['Color'] = colors[0]
+    else:
+        df['Color'] = [colors[-1] if max(i)<0 else colors[:-1][list(i).index(max(i))%(len(colors)-1)] for i in readings]
     if table: display(df)
         
     try:
