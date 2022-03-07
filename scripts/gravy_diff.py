@@ -134,7 +134,7 @@ def pepPositions(df): #adds a column of PepMid- the position number of the Pepti
     df[['PepStart','PepEnd']] = df[['PepStart','PepEnd']].apply(pd.to_numeric, errors='coerce', downcast='integer', axis=1)
     df['PepMid'] = [i[0]+int((i[1]-i[0])/2) for i in df[['PepStart', 'PepEnd']].values]
     
-    return df.drop(['PepStart', 'PepEnd'], axis=1)
+    return df
         
 def getGRAVYdiffs(fastaPath, table1Path, table2Path, save = True):
     if ".fasta" not in fastaPath: fastaPath+=".fasta"
