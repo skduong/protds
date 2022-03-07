@@ -189,9 +189,14 @@ def intensitySummary(classdict, intensityDf, df):
     df['Average Intensity'] = df["ProteinID"].apply(lambda x: intensdict[match[x]])
 
     #avg distances
-    df['DistanceToPlane'] = pd.to_numeric(df.DistanceToPlane, errors='coerce')
-    summary = df.groupby(["ProteinID", "SequenceGRAVY"]+list(df.columns[-5:]), as_index=False)[['DistanceToPlane']].mean()
-    return summary.rename(columns={"DistanceToPlane": "Average DistanceToPlane"})
+    if "DistanceToPlane" in df.columns:
+        df['DistanceToPlane'] = pd.to_numeric(df.DistanceToPlane, errors='coerce')
+        summary = df.groupby(["ProteinID", "SequenceGRAVY"]+list(df.columns[-5:]), as_index=False)[['DistanceToPlane']].mean()
+        return summary.rename(columns={"DistanceToPlane": "Average DistanceToPlane"})
+    elif "Mid_DistanceToPlane" in df.columns:
+        df['Mid_DistanceToPlane'] = pd.to_numeric(df.Mid_DistanceToPlane, errors='coerce')
+        summary = df.groupby(["ProteinID", "SequenceGRAVY"]+list(df.columns[-5:]), as_index=False)[['Mid_DistanceToPlane']].mean()
+        return summary.rename(columns={"Mid_DistanceToPlane": "Average DistanceToPlane"})
 
 def inputCheck(instr): #handle quotations in input responses
     checkstr = instr.replace('"', "'").split("'", 1)

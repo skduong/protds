@@ -3,7 +3,7 @@ def alignPep(proteinGroup, getCenters = True): #getCenters: return only the cent
     if proteins[protid].structures: #do alignment on PDB structures if they exist
         pdb = bestPDB(protid)
         seq = chainSeq(checkChains(pdb, protid)[0], pdb.structure)
-        #aligning "PepMid" positions to the structure
+        #aligning positions to the structure
         protLen = len(proteins[protid].getSequence())
         if len(seq[0]) in range(int(protLen-protLen*.2), int(protLen+protLen*.2)):
             ali = align.align_optimal(proteins[protid].getSequence(), seq[0], align.SubstitutionMatrix.std_protein_matrix())[0]
@@ -12,28 +12,31 @@ def alignPep(proteinGroup, getCenters = True): #getCenters: return only the cent
             
         mainseq = [i[0] for i in ali.trace]
         try:
-            alignedseq = map(lambda x: seq[1][x] if x!=-1 else -111, [ali.trace[mainseq.index(i-1)][1] if i in mainseq else -1 for i in proteinGroup[1]["PepMid"].values])
+            aligned = [map(lambda x: seq[1][x] if x!=-1 else -111,[ali.trace[mainseq.index(i-1)][1] 
+            if i in mainseq else -1 for i in proteinGroup[1][pos].values]) for pos in ("PepMid", "PepStart", "PepEnd")]
         except ValueError:
             ali = align.align_optimal(proteins[protid].getSequence(), seq[0], align.SubstitutionMatrix.std_protein_matrix())[0]
             mainseq = [i[0] for i in ali.trace]
-            alignedseq = map(lambda x: seq[1][x] if x!=-1 else -111, [ali.trace[mainseq.index(i-1)][1] if i in mainseq else -1 for i in proteinGroup[1]["PepMid"].values]) 
+            aligned = [map(lambda x: seq[1][x] if x!=-1 else -111,[ali.trace[mainseq.index(i-1)][1] 
+            if i in mainseq else -1 for i in proteinGroup[1][pos].values]) for pos in ("PepMid", "PepStart", "PepEnd")]
         structure = pdb.structure
-        coords = [structure[(structure.chain_id==pdb.bestChain[0]) & (structure.res_id==i)] for i in alignedseq]
+        coords = [[structure[(structure.chain_id==pdb.bestChain[0]) & (structure.res_id==i)] for i in alignedpos] for alignedpos in aligned]
         structName = pdb.PDBid
-        if any([i.shape[0]==0 for i in coords]): #missing coordinates
+        if any([i.shape[0]==0 for c in coords for i in c ]): #missing coordinates
             pred = proteins[protid].getPredictedStrucs()
             if pred: 
-                coords = [pred[pred.res_id==i] for i in proteinGroup[1]["PepMid"].values]
+                coords = [[pred[pred.res_id==i] for i in proteinGroup[1][pos].values] for pos in ("PepMid", "PepStart", "PepEnd")]
                 structName = "AlphaFold"
     else: #look for AlphaFold predictions if PDB structures aren't available
         pred = proteins[protid].getPredictedStrucs()
-        coords = [pred[pred.res_id==i] for i in proteinGroup[1]["PepMid"].values] if pred else [[]]
+        coords = [[pred[pred.res_id==i] for i in proteinGroup[1][pos].values] for pos in ("PepMid", "PepStart", "PepEnd")] if pred else [[]]
         structName = "AlphaFold"
     
     if getCenters:
-        return [struc.mass_center(i) if len(i)!=0 else i for i in coords], structName
+        centers = [[struc.mass_center(i) if len(i)!=0 else i for i in coord] for coord in coords]
+        return centers[0], structName, centers[1], centers[2]
     else:
-        return coords, structName
+        return coords[0], structName, coords[1], coords[2]
 
 def pepCenterDist(sortedData, getNoResults=False):
     '''
@@ -47,7 +50,7 @@ def pepCenterDist(sortedData, getNoResults=False):
     protGroup = sortedData.groupby('ProteinID')
     dists = []; means = []; stds = []; strucs=[]
     for p in protGroup:
-        pepCoords, pdb = alignPep(p, False)
+        pepCoords, pdb, startCoords, endCoords = alignPep(p, False)
         strucs += [pdb]*len(p[1])
         if sum([len(i) for i in pepCoords]) > 0:
             combined = struc.mass_center(struc.array([i for sub in pepCoords for i in sub]))
@@ -104,10 +107,10 @@ def planeSVD(X, p=[]): #X is a set of (X,Y,Z) points; p is a point the plane pas
     return a, b, c, d
 
 def pepPlane(proteinGroup, customPoint=False, returnP=False):
-    xyz, pdb = alignPep(proteinGroup)
+    xyz, pdb, xyzStart, xyzEnd = alignPep(proteinGroup)
     points = [i for i in xyz if len(i)>0 and not np.isnan(sum(i))] 
     if len(points) == 0:
-        return None, xyz, pdb
+        return None, xyz, pdb, xyzStart, xyzEnd
     if len(points) >3 and customPoint: #(if there are <3 points, the optimal plane goes through every point)
         try:
             colName = [i for i in proteinGroup[1].columns if ("1st15min" in i or "1st 15min" in i)][0]
@@ -124,7 +127,7 @@ def pepPlane(proteinGroup, customPoint=False, returnP=False):
     if returnP: 
         return planeSVD(np.array([x, y, z]).T, p), xyz, (points,p), pdb
     else:
-        return planeSVD(np.array([x, y, z]).T, p), xyz, pdb
+        return planeSVD(np.array([x, y, z]).T, p), xyz, pdb, xyzStart, xyzEnd
  
 def pepPlaneDist(sortedData, customPoint=False):
     '''
@@ -139,19 +142,24 @@ def pepPlaneDist(sortedData, customPoint=False):
     sortedData = sortedData[~sortedData['ProteinID'].isin(noResults)]
     protGroup = sortedData.groupby('ProteinID')
 
-    planeDists=[]; strucs=[]
+    planeDists=[]; strucs=[]; startDist=[]; endDist=[]
     for g in protGroup:
-        plane = pepPlane(g, customPoint)
-        if not plane[0]:
-            planeDists += ['NA' for i in plane[1]]
-            strucs += [plane[-1] for i in plane[1]]
+        params, mid, pdb, start, end = pepPlane(g, customPoint)
+        if not params:
+            for i in planeDists, startDist, endDist:
+                i += ['NA' for i in mid]
+            strucs += [pdb for i in mid]
             continue
         else:
-            allx, ally, allz = [np.array(i) for i in zip(*[i if len(i)>0 else np.array([np.nan, np.nan, np.nan]) for i in plane[1]])]
-            planeDists += [i if not np.isnan(i) else "Missing" for i in perpDist(plane[0], (allx,ally,allz))]
-            strucs += [plane[-1] for i in perpDist(plane[0], (allx,ally,allz))]
+            for xyz in [mid,planeDists], [start,startDist], [end,endDist]:
+                allx, ally, allz = [np.array(i) for i in zip(*[i if len(i)>0 else np.array([np.nan, np.nan, np.nan]) for i in xyz[0]])]
+                xyz[1] += [i if not np.isnan(i) else "Missing" for i in perpDist(params, (allx,ally,allz))]
+            strucs += [pdb for i in perpDist(params, (allx,ally,allz))]
    
-    sortedData["DistanceToPlane"] = planeDists
+    #sortedData["DistanceToPlane"] = planeDists
+    sortedData["Start_DistanceToPlane"] = startDist
+    sortedData["Mid_DistanceToPlane"] = planeDists
+    sortedData["End_DistanceToPlane"] = endDist
     sortedData["Structure"] = strucs
     return sortedData 
 
