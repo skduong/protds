@@ -202,19 +202,25 @@ def alignLoc(locs, protid, pdb): #get aligned positions for a list of locations
         ali = align.align_optimal(proteins[protid].getSequence(), seq[0], align.SubstitutionMatrix.std_protein_matrix())[0]
     else:
         ali = align.align_optimal(proteins[protid].getSequence(), seq[0], align.SubstitutionMatrix.std_protein_matrix(), local=True)[0]
+
     try:
         mainSeq = [i[0] for i in ali.trace]
         alignedLocs = [[list(map(lambda x: ali.trace[mainSeq.index(x-1)][1], location)) for location in loc] for loc in locs]
-        if len(locs)>1: 
-            missing = [[np.array(i[0])[np.where(np.array(i[1]) == -1)[0]] for i in zip(locs[0], alignedLocs[0])],
-                       [i[0] for i in zip(locs[1], alignedLocs[1]) if i[1]==[-1]]]
-        else: 
-            missing = []
-        return ([list(map(lambda x: seq[1][x], [list(map(lambda x: ali.trace[mainSeq.index(x-1)][1], 
-                filter(lambda x: ali.trace[mainSeq.index(x-1)][1] > -1, location))) for location in loc])) for loc in locs], missing)
+    except ValueError:
+        ali = align.align_optimal(proteins[protid].getSequence(), seq[0], align.SubstitutionMatrix.std_protein_matrix())[0] 
+        mainSeq = [i[0] for i in ali.trace]
+        alignedLocs = [[list(map(lambda x: ali.trace[mainSeq.index(x-1)][1], location)) for location in loc] for loc in locs]
     except Exception as e:
         print(e, "Something went wrong")
         return []
+    
+    if len(locs)>1: 
+        missing = [[np.array(i[0])[np.where(np.array(i[1]) == -1)[0]] for i in zip(locs[0], alignedLocs[0])],
+                       [i[0] for i in zip(locs[1], alignedLocs[1]) if i[1]==[-1]]]
+    else: 
+        missing = []
+    return ([list(map(lambda x: seq[1][x], [list(map(lambda x: ali.trace[mainSeq.index(x-1)][1], 
+            filter(lambda x: ali.trace[mainSeq.index(x-1)][1] > -1, location))) for location in loc])) for loc in locs], missing)
     
 #Distances
 def calcDist(pdb, chain, entry): #returns the distances between a PDB structure's binding sites and the entry's ModifiedLocationNum for a given chain

@@ -140,12 +140,11 @@ def processData(filepath):
 #(testing miscellaneous code and requests)
 def emailRow(row):
     return [row['ProteinID'], row['ModifiedLocationNum'].astype(int), row.name]
-def emailView(protid, loc1, loc2, best=True): #highlights all chains, assumes 2 sets of locations provided by datasets
-    entry = [protid, 1, 2]
+def emailView(protid, loc1, loc2, bestChain=True, chooseStruc=False): #assumes 2 sets of locations provided by datasets
     if protid in proteins.keys(): 
-        pdb = proteins[entry[0]].structures[selectPDB(proteins[entry[0]])]
-        chainSelect = '.'+checkChains(pdb, protid)[0] if best else ''
-        sites1, sites2 = [locToStr(i) for i in alignLoc([loc1, loc2], entry[0], pdb)[0]]
+        pdb = proteins[protid].structures[selectPDB(proteins[protid])] if chooseStruc else bestPDB(protid) 
+        chainSelect = '.'+checkChains(pdb, protid)[0] if bestChain else ''
+        sites1, sites2 = [locToStr(i) for i in alignLoc([loc1, loc2], protid, pdb)[0]]
         if len(sites1)>0 and len(sites2)>0: #they both have sites after alignment
              cmd = 'select {chain}:{s1}; color 000000; select {chain}:'.format(chain = chainSelect, s1 = ','.join(
                 [i for i in sites1]))+ ','.join([i for i in sites2])+'; color FFD700;'
@@ -153,7 +152,7 @@ def emailView(protid, loc1, loc2, best=True): #highlights all chains, assumes 2 
             cmd = ''
         return icn3dpy.view(q='mmdbid='+pdb.PDBid, command = cmd+';toggle highlight; view annotations; set view detailed view; set background white')
     else:
-        print("No results for", entry[0])
+        print("No results for", protid)
         return icn3dpy.view()
 
 if __name__ == "__main__":
