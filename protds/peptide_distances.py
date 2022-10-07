@@ -128,7 +128,7 @@ def pepPlane(proteinGroup, customPoint=False, returnP=False):
         return planeSVD(np.array([x, y, z]).T, p), xyz, (points,p), pdb
     else:
         return planeSVD(np.array([x, y, z]).T, p), xyz, pdb, xyzStart, xyzEnd
- 
+
 def pepPlaneDist(sortedData, customPoint=False):
     '''
     Get distances between a set of PeptideSequences and a Plane fitted through them

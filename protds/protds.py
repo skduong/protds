@@ -13,7 +13,9 @@ import biotite.structure.io.pdbx as pdbx
 #Bio: access UniProt's site information
 from Bio.SeqFeature import FeatureLocation
 from Bio import SwissProt
+from Bio import ExPASy
 #general utilities
+import math
 import numpy as np
 import pandas as pd
 from IPython.display import display
@@ -82,7 +84,23 @@ def get_uniprot (query='',query_type='ACC'): #for querying UniProtDB; returns an
     data = urllib.parse.urlencode(params).encode('ascii')
     request = urllib.request.Request(url, data)
     return urllib.request.urlopen(request, timeout=20)
-           
+
+def get_swissprot(pid): #temporary fix to updated swissprot FT
+    file_link = "https://rest.uniprot.org/uniprotkb/"+pid+".txt"
+    temp = NamedTemporaryFile()
+    with urllib.request.urlopen(file_link) as response:
+        while (line := response.readline().rstrip()):
+            line_text = str(line)
+            if ('FT' in line_text and 'ligand' in line_text):
+                continue
+            else:
+                temp.write(line)
+                temp.write(b'\n')
+    temp.seek(0)
+    swissprot = SwissProt.read(temp)
+    temp.close()
+    return swissprot
+
 def get_pdb(upid): #for a requested uniprotID, get structures list from ProteinDataBank
     search_operator = text_operators.ExactMatchOperator(
         value= upid.split('-')[0], 
@@ -131,7 +149,7 @@ def get_alphafold(upid): #get AlphaFoldDB predicted structures; returns a biotit
     except urllib.error.URLError as e:
         print(e, upid)
         return False
- 
+
 def searchPDB(id, uniprot=True, fasta=None): #add a new id to the dictionary
     global proteins
     if id not in proteins: 
@@ -139,8 +157,7 @@ def searchPDB(id, uniprot=True, fasta=None): #add a new id to the dictionary
             proteins[id] = Protein(id) 
             #get sites from UniProt
             if uniprot:
-                handle = get_uniprot(query = id, query_type = 'ACC')
-                proteins[id].record = SwissProt.read(handle)
+                proteins[id].record = get_swissprot(id)
             if fasta:
                 proteins[id].sequence = fasta
   
