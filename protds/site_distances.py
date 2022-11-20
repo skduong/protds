@@ -146,10 +146,10 @@ def emailView(protid, loc1, loc2, bestChain=True, chooseStruc=False): #assumes 2
         chainSelect = '.'+checkChains(pdb, protid)[0] if bestChain else ''
         sites1, sites2 = [locToStr(i) for i in alignLoc([loc1, loc2], protid, pdb)[0]]
         if len(sites1)>0 and len(sites2)>0: #they both have sites after alignment
-             cmd = 'select {chain}:{s1}; color 000000; select {chain}:'.format(chain = chainSelect, s1 = ','.join(
+             cmd = 'color A9A9A9;'+'select {chain}:{s1}; color 000000; select {chain}:'.format(chain = chainSelect, s1 = ','.join(
                 [i for i in sites1]))+ ','.join([i for i in sites2])+'; color FFD700;'
         else:
-            cmd = ''
+            cmd = 'color A9A9A9'
         return icn3dpy.view(q='mmdbid='+pdb.PDBid, command = cmd+';toggle highlight; view annotations; set view detailed view; set background white')
     else:
         print("No results for", protid)
