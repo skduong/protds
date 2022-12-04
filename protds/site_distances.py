@@ -150,7 +150,11 @@ def emailView(protid, loc1, loc2, bestChain=True, chooseStruc=False): #assumes 2
                 [i for i in sites1]))+ ','.join([i for i in sites2])+'; color FFD700;'
         else:
             cmd = 'color A9A9A9'
-        return icn3dpy.view(q='mmdbid='+pdb.PDBid, command = cmd+';toggle highlight; view annotations; set view detailed view; set background white')
+            
+        if not proteins[protid].predicted:
+            return icn3dpy.view(q='mmdbid='+pdb.PDBid, command = cmd+';toggle highlight; view annotations; set view detailed view; set background white')
+        else:
+            return icn3dpy.view(command = 'load mmdbaf1 '+protid+' | parameters &mmdbafid='+protid+'&bu=1;'+cmd+';toggle highlight; view annotations; set view detailed view; set background white')
     else:
         print("No results for", protid)
         return icn3dpy.view()

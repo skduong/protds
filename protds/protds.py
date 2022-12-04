@@ -40,8 +40,8 @@ class Protein: #each unique protein in the dataset is represented by a Protein o
         self.predicted = None #predicted AlphaFold structure
     
     def getPDBs(self):
-        return [i.PDBid for i in self.structures] 
-    
+        return [i.PDBid for i in self.structures]
+
     def getSequence(self):
         if self.sequence == None:
             return seq.ProteinSequence(self.record.sequence.replace('U', 'X').replace('O', 'X'))
@@ -108,7 +108,7 @@ def get_pdb(upid): #for a requested uniprotID, get structures list from ProteinD
     return_type = ReturnType.ENTRY
     try: 
         results = perform_search(search_operator, return_type)
-        if len(results)>15: 
+        if len(results)>50: 
             results = []
             for i in np.arange(1,5,0.5):
                 try: 
@@ -168,7 +168,8 @@ def searchPDB(id, uniprot=True, fasta=None): #add a new id to the dictionary
                 print("AlphaFold predictions will be used for", id, '\n')
                 prediction = get_alphafold(id.split('-')[0])
                 if prediction: 
-                    proteins[id].predicted = prediction
+                    proteins[id].structures = [PDB('AlphaFold', prediction)]
+                    proteins[id].predicted = prediction 
                 else: 
                     print("Failed to get prediction for", id)
                     del proteins[id]
