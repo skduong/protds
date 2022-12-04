@@ -154,7 +154,7 @@ def emailView(protid, loc1, loc2, bestChain=True, chooseStruc=False): #assumes 2
         if not proteins[protid].predicted:
             return icn3dpy.view(q='mmdbid='+pdb.PDBid, command = cmd+';toggle highlight; view annotations; set view detailed view; set background white')
         else:
-            return icn3dpy.view(command = 'load mmdbaf1 '+protid+' | parameters &mmdbafid='+protid+'&bu=1;'+cmd+';toggle highlight; view annotations; set view detailed view; set background white')
+            return icn3dpy.view(command = 'load af '+protid+';'+cmd+';toggle highlight; view annotations; set view detailed view; set background white')
     else:
         print("No results for", protid)
         return icn3dpy.view()
