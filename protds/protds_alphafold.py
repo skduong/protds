@@ -46,12 +46,31 @@ def get_distance_to_features(upid, mod_num):
         return ['no alphafold'],[0]
     
     modlocs_pts = structure[0][structure.res_id == mod_num]
-    feature_types=[]; feature_dists=[]
+    feature_types=[]; feature_locs=[]; feature_dists=[] 
     
     for f in features:
         featlocs = [i for i in range(f.location.start, f.location.end+1)]
         feature_pts = structure[0][[i in featlocs for i in structure.res_id]]
         feature_types.append(f.type)
+        feature_locs.append(str(f.location).replace(":", "-")[1:-1])
         feature_dists.append(struc.distance(struc.mass_center(feature_pts), struc.mass_center(modlocs_pts)))
                              
-    return feature_types, feature_dists
+    return feature_types, feature_locs, feature_dists
+
+# def get_distance_to_features(upid, mod_num):
+#     features = get_swissprot(upid).features
+#     structure = get_alphafold(upid)
+    
+#     if not structure: 
+#         return ['no alphafold'],[0]
+    
+#     modlocs_pts = structure[0][structure.res_id == mod_num]
+#     feature_types=[]; feature_dists=[]
+    
+#     for f in features:
+#         featlocs = [i for i in range(f.location.start, f.location.end+1)]
+#         feature_pts = structure[0][[i in featlocs for i in structure.res_id]]
+#         feature_types.append(f.type)
+#         feature_dists.append(struc.distance(struc.mass_center(feature_pts), struc.mass_center(modlocs_pts)))
+                             
+#     return feature_types, feature_dists
