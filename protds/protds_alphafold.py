@@ -49,10 +49,10 @@ def get_distance_to_features(upid, mod_num):
     feature_types=[]; feature_locs=[]; feature_dists=[] 
     
     for f in features:
-        featlocs = [i for i in range(f.location.start, f.location.end+1)]
+        featlocs = [i for i in range(f.location.start, f.location.end)]
         feature_pts = structure[0][[i in featlocs for i in structure.res_id]]
         feature_types.append(f.type)
-        feature_locs.append(str(f.location).replace(":", "-")[1:-1])
+        feature_locs.append(str(f.location.start+1) +'-'+ str(f.location.end))
         feature_dists.append(struc.distance(struc.mass_center(feature_pts), struc.mass_center(modlocs_pts)))
                              
     return feature_types, feature_locs, feature_dists
