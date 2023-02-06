@@ -43,16 +43,23 @@ def get_distance_to_features(upid, mod_num):
     structure = get_alphafold(upid)
     
     if not structure: 
-        return ['no alphafold'],[0]
+        return ['no alphafold'],['no alphafold'],['no alphafold'],[-1]
     
-    modlocs_pts = structure[0][structure.res_id == mod_num]
-    feature_types=[]; feature_locs=[]; feature_dists=[] 
+    modlocs_pts = structure[0][structure.res_id == mod_num-1]
+    feature_types=[]; feature_locs=[]; feature_dists=[]; feature_notes=[] 
     
     for f in features:
         featlocs = [i for i in range(f.location.start, f.location.end)]
         feature_pts = structure[0][[i in featlocs for i in structure.res_id]]
         feature_types.append(f.type)
-        feature_locs.append(str(f.location.start+1) +'-'+ str(f.location.end))
         feature_dists.append(struc.distance(struc.mass_center(feature_pts), struc.mass_center(modlocs_pts)))
+        
+        description = list(f.qualifiers.items())[0]
+        feature_notes.append(description[0]+' = '+description[1])
+        
+        if f.location.start+1 == f.location.end:
+            feature_locs.append(str(f.location.end))
+        else:
+            feature_locs.append(str(f.location.start+1) +'-'+ str(f.location.end))
                              
-    return feature_types, feature_locs, feature_dists
+    return feature_types, feature_notes, feature_locs, feature_dists
