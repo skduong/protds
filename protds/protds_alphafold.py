@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import icn3dpy
 import urllib, requests, io, gzip, os
 from Bio import SwissProt
 #biotite: tool for working with structure coordinates and sequences
@@ -71,3 +72,10 @@ def get_distance_to_features(upid, mod_num):
             feature_dists.append(-1)
          
     return feature_types, feature_notes, feature_locs, feature_dists
+
+def highlight_alphafold(prot_id, loc1, loc2, col1='FF0', col2='F00'):
+    highlight1 = "; select " + " or ".join([".A:"+l for l in loc1]) + "; color "+col1
+    highlight2 = "; select " + " or ".join([".A:"+l for l in loc2]) + "; color "+col2
+    settings = "; select .A; toggle highlight; view annotations; set view detailed view; set background white;"
+    
+    return icn3dpy.view(command="load af "+prot_id+ highlight1 + highlight2 + settings)
